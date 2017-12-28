@@ -1,0 +1,15 @@
+{
+    "sample_rate": 16000,
+    "n_mfcc": 20,
+    "n_mels": 40,
+    "n_fft": 1024,
+    "hop_length": 0.02,
+    "win_length": 0.04,
+    "fmin": 0,
+    "fmax": 8000,
+    "center": true,
+    "width": 9,
+    "htk_mfcc": false,
+    "htk_mel": true,
+    "log_mel": true
+}
