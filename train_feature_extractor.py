@@ -148,6 +148,10 @@ def get_feature(file, label):
   file_test, _ = os.path.splitext(basename)
   file_test = train_feature_path + label + '/' + file_test
   file_test += '.h5'
+  
+  if not isdir(train_feature_path + label):
+    mkdir(train_feature_path + label)
+
   if isfile(file_test):
     return
 
