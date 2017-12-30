@@ -28,6 +28,9 @@ import matplotlib.pyplot as plt
 
 from os import listdir
 
+import multiprocessing
+from multiprocessing import Pool
+
 import h5py
 
 # feature file paths
@@ -62,6 +65,13 @@ def main(argv):
   x_train, y_train, x_val, y_val, x_test, y_test = split_dataset(label_dict)
   # x_test, y_test =  split_dataset(label_dict)
 
+  print(x_train.shape)
+  print(y_train.shape)
+  print(x_val.shape)
+  print(y_val.shape)
+  print(x_test.shape)
+  print(y_test.shape)
+  
   print("model constructing!")
   model = Sequential()
   model.add(Dense(x_train, input_dim=x_train[0].shape[1],
@@ -95,9 +105,14 @@ def main(argv):
   print("\n%s: %.2f%%" % (model.metrics_names[1], score[1] * 100))
 
 def split_dataset(label_dict):
-  train_feature_vector = get_feature('train')
-  val_feature_vector = get_feature('val')
-  test_feature_vector = get_feature('test')
+  n_processes = multiprocessing.cpu_count()
+  pool = Pool(processes=n_processes)
+
+  result = pool.map(get_feature, ['train', 'val', 'test'])
+
+  train_feature_vector = result[0]
+  val_feature_vector = result[1]
+  test_feature_vector = result[2]
 
   n_classes = len(label_dict)
 
@@ -129,7 +144,8 @@ def split_dataset(label_dict):
   return x_train, y_train, x_val, y_val, x_test, y_test
   # return x_test, y_test
 
-def get_feature(mode):
+def get_feature(arg):
+  mode = arg
   if 'train' == mode:
     path = train_feature_path
   elif 'val' == mode:
