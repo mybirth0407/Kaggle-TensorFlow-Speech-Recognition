@@ -14,11 +14,11 @@ import json
 import shutil
 
 # audio paths
-train_audio_path = './train/audio/'
+train_audio_path = '../train/audio/'
 
 # information file
-validation_file = './train/validation_list.txt'
-testing_file = './train/testing_list.txt'
+validation_file = '../train/validation_list.txt'
+testing_file = '../train/testing_list.txt'
 if not isdir('./feature'):
   mkdir('./feature')
 train_feature_path = './feature/train/'
@@ -94,7 +94,8 @@ def get_train_feature_extract(val_list, test_list):
     if not isdir(train_feature_path + 'validation/' + label):
       mkdir(train_feature_path + 'validation/' + label)
 
-    shutil.move(train_feature_path + file,
+    shutil.move(
+        train_feature_path + file,
         train_feature_path + 'validation/' + file
     )
 
@@ -144,22 +145,31 @@ def get_feature(file, label):
   if label in except_label:
     label = 'silence'
 
-  basename = os.path.basename(os.path.normpath(file))
-  file_test, _ = os.path.splitext(basename)
-  file_test = train_feature_path + label + '/' + file_test
-  file_test += '.h5'
+  try:
+    basename = os.path.basename(os.path.normpath(file))
+    file_test, _ = os.path.splitext(basename)
+    file_test = train_feature_path + label + '/' + file_test
+    file_test += '.h5'
+  except Exception as e:
+    print(e)
+    return
   
   if not isdir(train_feature_path + label):
     mkdir(train_feature_path + label)
 
   if isfile(file_test):
     return
-
-  y, sr = librosa.load(file, sr=param.get('sample_rate'))
-  mel = get_mel(y)
-  mfcc = get_mfcc(y)
-  mfcc_del = get_mfcc_delta(mfcc)
-  mfcc_acc = get_mfcc_acceleration(mfcc)
+    
+  try:
+    y, sr = librosa.load(file, sr=param.get('sample_rate'))
+    y = split_silence(y)
+    mel = get_mel(y)
+    mfcc = get_mfcc(y)
+    mfcc_del = get_mfcc_delta(mfcc)
+    mfcc_acc = get_mfcc_acceleration(mfcc)
+  except Exception as e:
+    print(e)
+    return
 
   # 1 + len(mel[0]) ...
   # 1 is label location
@@ -173,6 +183,29 @@ def get_feature(file, label):
     feature_vector = np.vstack((feature_vector, feature))
 
   save_hdf(file_test, label, feature_vector)
+
+def split_silence(y):
+  win_length = int(param.get('win_length') * param.get('sample_rate'))
+  hop_length = int(param.get('hop_length') * param.get('sample_rate'))
+
+  c = []
+  start = 0
+  end = len(y)
+
+  for i in range(0, sr, 640):
+      x = y[:i]
+      c.append(np.abs(np.var(x)))
+
+  for i in range(1, len(c)):
+      if c[i] > 3 * c[i-1]:
+          start = i - 1
+          break
+  for i in range(1, len(c)):
+      if 3 * c[i] < c[i-1]:
+          end = i - 1
+        
+  return y[start * win_length + hop_length:end * win_length - hop_length]
+
 
 def save_hdf(file, label, arr):
   h5f = h5py.File(file, 'w')

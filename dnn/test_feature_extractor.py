@@ -14,7 +14,7 @@ import json
 import shutil
 
 # audio paths
-test_audio_path = './test/audio/'
+test_audio_path = '../test/audio/'
 
 # information file
 if not isdir('./feature'):
@@ -64,6 +64,8 @@ def get_test_feature_extract():
   pool.map(
     get_feature, files
   )
+  pool.close()
+  pool.join()
 
   print('test feature extractor done!')
 
@@ -75,12 +77,16 @@ def get_feature(file):
   if isfile(file_test):
     return
 
-  file = test_audio_path + file
-  y, sr = librosa.load(file, param.get('sample_rate'))
-  mel = get_mel(y)
-  mfcc = get_mfcc(y)
-  mfcc_del = get_mfcc_delta(mfcc)
-  mfcc_acc = get_mfcc_acceleration(mfcc)
+  try:
+    file = test_audio_path + file
+    y, sr = librosa.load(file, param.get('sample_rate'))
+    mel = get_mel(y)
+    mfcc = get_mfcc(y)
+    mfcc_del = get_mfcc_delta(mfcc)
+    mfcc_acc = get_mfcc_acceleration(mfcc)
+  except Exception as e:
+    print(e)
+    return
 
   feature_vector = np.empty((
       0, len(mel[0]) + len(mfcc[0]) + len(mfcc_del[0]) + len(mfcc_acc[0])
