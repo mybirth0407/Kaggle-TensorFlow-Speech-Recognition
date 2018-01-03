@@ -17,6 +17,7 @@ from random import shuffle
 meaningful_label = ['down', 'go', 'left', 'no', 'off',
                     'on', 'right', 'silence', 'stop', 'up', 'yes']
 meaningful_label.sort()
+
 # except label
 except_label = ['unknown']
 
