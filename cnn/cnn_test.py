@@ -30,17 +30,19 @@ from os.path import isdir
 # Using Data Processing for Multiprocessing.
 import multiprocessing
 from multiprocessing import Pool
-# Use List Random Shuffle. 
-from random import shuffle
 # Use HDF File Format.
 import h5py
 
 # labels
-all_label = listdir('./feature/train/train')
-all_label.sort()
-all_label_dict = {}
-for (i, label) in zip(range(len(all_label)), all_label):
-  all_label_dict[label] = i
+# all_label = listdir('./feature/train/train')
+# all_label.sort()
+# all_label_dict = {}
+# for (i, label) in zip(range(len(all_label)), all_label):
+#   all_label_dict[label] = i
+#
+# int_dict = dict(zip(
+#     all_label_dict.values(), all_label_dict.keys()
+# ))
 
 # mearningful labels
 meaningful_label = ['down', 'go', 'left', 'no', 'off',
@@ -59,26 +61,29 @@ for (i, label) in zip(range(len(except_label)), except_label):
 for (i, label) in zip(range(n_except, len(meaningful_label)), meaningful_label):
   meaningful_label_dict[label] = i
 
+
 int_dict = dict(zip(
-    all_label_dict.values(), all_label_dict.keys()
+    meaningful_label_dict.values(), meaningful_label_dict.keys()
 ))
+
 
 def get_feature_file_list(file_list):
   n_processes = multiprocessing.cpu_count()
   pool = Pool(processes=n_processes)
-  result =  pool.map(get_feature_file, file_list)
+  result = pool.map(get_feature_file, file_list)
   pool.close()
   pool.join()
+
   return result
 
 def get_feature_file(file):
   print(file + ' start!')
   h5f = h5py.File(file, 'r')
-  feature_vector = h5f['feature'][:]
+  feature = h5f['feature'][:]
   h5f.close()
   print(file + ' done!')
 
-  return feature_vector
+  return feature
 
 def most_common(l):
     return max(set(l), key=l.count)
@@ -102,16 +107,21 @@ if __name__ == '__main__':
   import time
   # f = open('./pred/pred_' + str(time.time()) +  '.csv', 'w')
   pred_file, _ = os.path.splitext(sys.argv[1])
-  pred_file = os.path.join('/pred/', pred_file)
+  pred_file = os.path.join('./pred/', pred_file)
   f = open(pred_file + '.csv', 'w')
   f.write('fname,label\n')
 
   for i in range(len(file_list)):
-    feature_vector_list = get_feature_file_list(file_list[i])
-
+    feature_list = get_feature_file_list(file_list[i])
     cnt = 1
-    will = len(feature_vector_list)
-    for feature in feature_vector_list:
+    will = len(feature_list)
+    labels = []
+
+    #########
+    for j in range(will):
+      feature = feature_list[j]
+      # print(feature.shape)
+      feature = feature.reshape(1, 51, 39, 1)
       print(str(cnt) + '/' + str(will))
       # axis = 0, column appending
       predict = model.predict(feature, batch_size=256)
@@ -123,12 +133,14 @@ if __name__ == '__main__':
       else:
         y = except_label[0]
       cnt += 1
+      labels.append(y)
     
-    for file in file_list[i]:
+    for j in range(will):
+      file = file_list[i][j]
       fname = os.path.basename(os.path.normpath(file))
       fname, _ = os.path.splitext(fname)
       fname = fname + '.wav'
 
-      f.write(fname + ',' + str(y) + '\n')
+      f.write(fname + ',' + str(labels[j]) + '\n')
 
   f.close()

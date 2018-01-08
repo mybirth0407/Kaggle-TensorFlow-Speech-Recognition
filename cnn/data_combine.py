@@ -14,27 +14,29 @@ from random import shuffle
 
 
 # labels
-# meaningful_label = ['down', 'go', 'left', 'no', 'off',
-#                     'on', 'right', 'silence', 'stop', 'up', 'yes']
-# meaningful_label.sort()
-# # except label
-# except_label = ['unknown']
-
-# meaningful_label_dict = {}
-
-# n_except = 0
-# for (i, label) in zip(range(len(except_label)), except_label):
-#   meaningful_label_dict[label] = i
-#   n_except += 1
-
-# for (i, label) in zip(range(n_except, len(meaningful_label)), meaningful_label):
-#   meaningful_label_dict[label] = i
-
-meaningful_label = listdir('./feature/train/train')
+# 12 class
+meaningful_label = ['down', 'go', 'left', 'no', 'off',
+                    'on', 'right', 'silence', 'stop', 'up', 'yes']
 meaningful_label.sort()
+# except label
+except_label = ['unknown']
+
 meaningful_label_dict = {}
-for (i, label) in zip(range(len(meaningful_label)), meaningful_label):
+
+n_except = 0
+for (i, label) in zip(range(len(except_label)), except_label):
   meaningful_label_dict[label] = i
+  n_except += 1
+
+for (i, label) in zip(range(n_except, len(meaningful_label)), meaningful_label):
+  meaningful_label_dict[label] = i
+
+# 31 class
+# meaningful_label = listdir('./feature/train/train')
+# meaningful_label.sort()
+# meaningful_label_dict = {}
+# for (i, label) in zip(range(len(meaningful_label)), meaningful_label):
+#   meaningful_label_dict[label] = i
   
 
 def map_func(x):
@@ -47,9 +49,10 @@ def map_func(x):
 def get_feature_mode(mode, file_list):
   print(mode + ' data loading!')
   # add unknown
-  n_meaningful_class = len(meaningful_label)
+  n_meaningful_class = len(meaningful_label) + 1
   shuffle(file_list)
   feature_vector_list = get_feature_file_list(file_list)
+  print(len(feature_vector_list))
   feature_vector = np.empty((0, feature_vector_list[0][0].shape[0]))
 
   cnt = 1
@@ -60,20 +63,22 @@ def get_feature_mode(mode, file_list):
     feature_vector = np.append(feature_vector, feature, axis=0)
     cnt += 1
 
-  shuffle(feature_vector)
   x = feature_vector[:, :-1]
   y = feature_vector[:, -1]
+  y = np.array([y[i] for i in range(0, y.shape[0], 51)])
+  # print(x.shape)
+  # print(y.shape)
+  # stop()
   feature_vector = None
 
   y = list(map(map_func, [y.decode('utf-8') for y in y]))
   y = np_utils.to_categorical(y, num_classes=n_meaningful_class)
   print(x.shape)
   print(y.shape)
-  x = np.hstack([x, y])
-  y = None
+  x = np.reshape(x, (x.shape[0] // 51, 51, 39))
   print(mode + ' data loading done!')
 
-  return x
+  return x, y
 
 def get_feature_file_list(file_list):
   n_processes = multiprocessing.cpu_count()
@@ -82,6 +87,7 @@ def get_feature_file_list(file_list):
   shuffle(result)
   pool.close()
   pool.join()
+
   return result
 
 def get_feature_file(file):
@@ -97,10 +103,13 @@ def stop():
   while True: pass
 
 def gen3digit(x):
-  return [f"{i:03}" for i in [x]]
+  return [f"{i:03}" for i in [x]][0]
 
 if __name__ == '__main__':
-  path = os.path.join('./feature/train', sys.argv[1])
+  if sys.argv[1] == 'aug':
+    path = './feature/augmentation/train/'
+  else:
+    path = os.path.join('./feature/train', sys.argv[1])
 
   labels = listdir(path)
   labels.sort()
@@ -116,7 +125,6 @@ if __name__ == '__main__':
 
     for file in base_files:
       file_list.append(os.path.join(base, file))
-
   
   n = int(sys.argv[2])
   
@@ -130,14 +138,13 @@ if __name__ == '__main__':
   n_sample = 0
   for i in range(len(file_list)):
     file_chunk = file_list[i]
-    x = get_feature_mode(str(i) + '\'th', file_chunk)
+    print(len(file_chunk))
+    x, y = get_feature_mode(str(i) + '\'th', file_chunk)
     n_sample += x.shape[0]
-    n_x = x.shape[0]
-
-    h5f = h5py.File(os.path.join('./hdf/', sys.argv[1] + gen3digit(i) + '.h5'), 'w')
-    # h5f.create_dataset('feature', data=x[i * n_x: (i + 1) * n_x])
-    shuffle(x)
+    fname = sys.argv[1] + gen3digit(i)
+    h5f = h5py.File(os.path.join('./hdf/', fname + '.h5'), 'w')
     h5f.create_dataset('feature', data=x)
+    h5f.create_dataset('label', data=y)
     h5f.close()
     # gc plz..
     file_chunk = None

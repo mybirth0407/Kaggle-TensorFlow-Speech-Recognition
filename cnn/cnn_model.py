@@ -2,6 +2,10 @@
 from keras import metrics
 # Keras perceptron neuron layer implementation.
 from keras.layers import Dense
+# Keras Convolution
+from keras.layers import Conv2D
+from keras.layers import MaxPooling2D
+from keras.layers import Flatten
 # Keras Dropout layer implementation.
 from keras.layers import Dropout
 # Keras Activation Function layer implementation.
@@ -35,7 +39,7 @@ import h5py
 def main(argv):
 ###############################################################################
 
-  epochs = 200
+  epochs = 12
   batch_size = 256
 
 ###############################################################################
@@ -52,13 +56,16 @@ def main(argv):
       val_list.append(os.path.join(argv[1], file))
     elif file.find('test') != -1:
       test_list.append(os.path.join(argv[1], file))
-    elif file.find('train') != -1:
+    else:
       train_list.append(os.path.join(argv[1], file))
 
   # gc plz..
   file_list = None
 
   x_val, y_val = get_feature_mode('val', val_list)
+  x_val = x_val.reshape(x_val.shape[0], 51, 39, 1)
+  print(x_val.shape)
+  print(y_val.shape)
 
   print('data loading done!')
 
@@ -66,27 +73,30 @@ def main(argv):
 
   print(x_val.shape[1])
   print(y_val.shape[1])
+  input_shape = (51, 39, 1)
   print('model constructing!')
   model = Sequential()
-  model.add(Dense(x_val.shape[1], input_dim=x_val.shape[1],
-      kernel_initializer='random_uniform', activation='relu'))
-  model.add(Dense(200, kernel_initializer='random_uniform'))
-  model.add(BatchNormalization())
-  model.add(Activation('relu'))
-  model.add(Dense(200, kernel_initializer='random_uniform'))
-  model.add(BatchNormalization())
-  model.add(Activation('relu'))
-  model.add(Dense(100, kernel_initializer='random_uniform'))
-  model.add(BatchNormalization())
-  model.add(Activation('relu'))
-  model.add(Dense(y_val.shape[1], activation='softmax'))
+  model.add(Conv2D(32, (3, 3), activation = 'relu', input_shape=input_shape))
 
-  adam = optimizers.Adam(
-      lr=0.0003
-  )
+  model.add(MaxPooling2D(pool_size=(2, 2)))
+
+  model.add(Conv2D(32, (3, 3), activation = 'relu'))
+
+  model.add(MaxPooling2D(pool_size=(2, 2)))
+
+  model.add(Flatten())
+  model.add(Dense(100))
+  model.add(BatchNormalization())
+  model.add(Activation('relu'))
+  model.add(Dense(100))
+  model.add(BatchNormalization())
+  model.add(Activation('relu'))
+  model.add(Dense(12, activation = 'softmax')) #Last layer with one output per class
+
   model.compile(
-      loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy']
+      loss='categorical_crossentropy', optimizer='adam', metrics=["accuracy"]
   )
+  model.summary()
   print('model constructing done!')
 
 ###############################################################################
@@ -95,7 +105,7 @@ def main(argv):
 
   model.fit_generator(
       generator=generate_file(train_list, batch_size),
-      steps_per_epoch=5932,
+      steps_per_epoch=577,
       validation_data=(x_val, y_val),
       validation_steps=y_val.shape[0] // batch_size,
       epochs=epochs,
@@ -113,14 +123,15 @@ def main(argv):
 
   print('model save!')
   import time
-  model.save('dcase_model_' + str(time.time()) + '.h5')
+  model.save('cnn_model_' + str(time.time()) + '.h5')
   print('model save done!')
 
 ###############################################################################
 
   print('model evaluate!')
   x_test, y_test = get_feature_mode('test', test_list)
-  predict = model.predict(x_test, batch_size=batch_size)
+  x_test = x_test.reshape(x_test.shape[0], 51, 39, 1)
+  # predict = model.predict(x_test, batch_size=batch_size)
   score = model.evaluate(x_test, y_test, batch_size=batch_size)
   print('model evaluate done!')
 
@@ -131,20 +142,21 @@ def main(argv):
 
 
 def generate_file(file_list, batch_size):
+  shuffle(file_list)
   while True:
     for file in file_list:
       h5f = h5py.File(file, 'r')
-      feature_vector = h5f['feature'][:]
+      feature = h5f['feature'][:]
+      feature = feature.reshape(feature.shape[0], 51, 39, 1)
+      label = h5f['label'][:]
       h5f.close()
-
-      shuffle(feature_vector)
-      x = feature_vector[:, 40:79]
-      y = feature_vector[:, 157:]
       # gc plz..
-      feature_vector = None
       i = 0
-      for i in range(y.shape[0] // batch_size):
-        yield(x[i*batch_size:(i+1)*batch_size], y[i*batch_size:(i+1)*batch_size])
+      for i in range(label.shape[0] // batch_size):
+        yield(
+          feature[i*batch_size:(i+1)*batch_size],
+          label[i*batch_size:(i+1)*batch_size]
+        )
 
         # yield(x, y)
         i += 1
@@ -153,22 +165,27 @@ def get_feature_mode(mode, file_list):
   print(mode + ' data loading!')
 
   feature_vector_list = get_feature_file_list(file_list)
-  feature_vector = np.empty((0, feature_vector_list[0][0].shape[0]))
+  print(len(feature_vector_list))
+  print(feature_vector_list[0][0].shape)
+  print(feature_vector_list[0][1].shape)
+  # print(feature_vector_list[0][0][0].shape)
+  # print(feature_vector_list[0][1][0])
 
-  cnt = 1
-  will = len(feature_vector_list)
-  for feature in feature_vector_list:
-    print(str(cnt) + '/' + str(will))
-    # axis = 0, column appending
-    feature_vector = np.append(feature_vector, feature, axis=0)
-    cnt += 1
+  # feature_vector = np.empty((0, feature_vector_list[0][0][0].shape[0]))
+  # cnt = 1
+  # will = len(feature_vector_list)
+  # for feature in feature_vector_list[0][0]:
+  #   print(feature.shape)
+  #   stop()
+  #   print(str(cnt) + '/' + str(will))
+  #   # axis = 0, column appending
+  #   feature_vector = np.append(feature_vector[0], feature, axis=0)
+  #   cnt += 1
 
-  x = feature_vector[:, 40:79]
-  y = feature_vector[:, 157:]
-  feature_vector = None
   print(mode + ' data loading done!')
 
-  return x, y
+  # return features, labels
+  return feature_vector_list[0][0], feature_vector_list[0][1]
 
 def get_feature_file_list(file_list):
   n_processes = multiprocessing.cpu_count()
@@ -182,11 +199,12 @@ def get_feature_file_list(file_list):
 def get_feature_file(file):
   print(file + ' start!')
   h5f = h5py.File(file, 'r')
-  feature_vector = h5f['feature'][:]
+  feature = h5f['feature'][:]
+  label = h5f['label'][:] 
   h5f.close()
   print(file + ' done!')
 
-  return feature_vector
+  return (feature, label)
 
 def stop():
   while True: pass

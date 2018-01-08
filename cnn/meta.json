@@ -1,6 +1,6 @@
 {
     "sample_rate": 16000,
-    "n_mfcc": 20,
+    "n_mfcc": 39,
     "n_mels": 40,
     "n_fft": 1024,
     "hop_length": 0.02,
@@ -12,5 +12,5 @@
     "htk_mfcc": false,
     "htk_mel": true,
     "log_mel": true,
-    "window": "hamming_asymmetric"
+    "window": "hann_asymmetric"
 }

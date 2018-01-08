@@ -33,7 +33,7 @@ if __name__ == '__main__':
       val_list.append(os.path.join(sys.argv[1], file))
     elif file.find('test') != -1:
       test_list.append(os.path.join(sys.argv[1], file))
-    elif file.find('train') != -1:
+    else:
       train_list.append(os.path.join(sys.argv[1], file))
 
   val = cnt(val_list, val_cnt)

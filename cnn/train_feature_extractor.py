@@ -15,13 +15,22 @@ import shutil
 
 # audio paths
 train_audio_path = '../train/audio/'
+train_feature_path = './feature/train/'
+try:
+  if sys.argv[2] == 'aug':
+    print('augmentation data')
+    if not isdir('./feature/augmentation'):
+      mkdir('./feature/augmentation')
+    train_audio_path = '../augmentation/audio/'
+    train_feature_path = './feature/augmentation/train/'
+except Exception as e:
+  print(e)
 
 # information file
 validation_file = '../train/validation_list.txt'
 testing_file = '../train/testing_list.txt'
 if not isdir('./feature'):
   mkdir('./feature')
-train_feature_path = './feature/train/'
 if not isdir(train_feature_path):
   mkdir(train_feature_path)
 
@@ -73,14 +82,19 @@ def get_train_feature_extract(val_list, test_list):
 
   # get train audio label
   labels = listdir(train_audio_path)
-
+  labels.sort()
   # using process pool(like thread pool)
   pool = Pool(processes=n_processes)
   pool.map(
-    get_feature_of_path, [(train_audio_path + label) for label in labels]
+      get_feature_path, [(train_audio_path + label) for label in labels]
   )
   pool.close()
 
+  try:
+    if sys.argv[2] == 'aug':
+      return
+  except Exception as e:
+    print(e)
   # move files according data set
   # validation set
   if not isdir(train_feature_path + 'validation'):
@@ -128,7 +142,7 @@ def get_train_feature_extract(val_list, test_list):
 
   print('train feature extractor done!')
 
-def get_feature_of_path(arg):
+def get_feature_path(arg):
   path = arg
   file_list = listdir(path)
 
@@ -161,12 +175,15 @@ def get_feature(file, label):
     return
     
   try:
-    y, sr = librosa.load(file, sr=param.get('sample_rate'))
-    start, end = split_silence(y)
-    mel = get_mel(y)[start:end]
-    mfcc = get_mfcc(y)[start:end]
-    mfcc_del = get_mfcc_delta(mfcc)
-    mfcc_acc = get_mfcc_acceleration(mfcc)
+    y, sr = load_audio(file)
+    # start, end = split_silence(y)
+    # mel = get_mel(y)
+    # mel = get_mel(y)[start:end]
+    mfcc = get_mfcc(y[0])
+    for i in range(1, len(y)):
+      mfcc = np.vstack((mfcc, get_mfcc(y[i])))
+    # mfcc_del = get_mfcc_delta(mfcc)
+    # mfcc_acc = get_mfcc_acceleration(mfcc)
     # print(mel.shape)
     # print(mfcc.shape)
     # print(mfcc_del.shape)
@@ -179,16 +196,30 @@ def get_feature(file, label):
   # 1 + len(mel[0]) ...
   # 1 is label location
   feature_vector = np.empty((
-      0, 1 + len(mel[0]) + len(mfcc[0]) + len(mfcc_del[0]) + len(mfcc_acc[0])
+      0, 1 + len(mfcc[0])
   ))
 
-  for i in range(len(mel)):
+  for i in range(len(mfcc)):
     feature = np.hstack(
-      [mel[i], mfcc[i], mfcc_del[i], mfcc_acc[i], str.encode(label)]
+        [mfcc[i], str.encode(label)]
     )
     feature_vector = np.vstack((feature_vector, feature))
 
-  save_hdf(file_test, label, feature_vector)
+  save_hdf(file_test, feature_vector)
+
+def stop():
+  while True: pass
+
+def load_audio(file_path):
+  y, sr = librosa.load(file_path, sr=param.get('sample_rate'))
+  if len(y) > sr:
+    a = len(y) // sr
+    y = y[:sr * a]
+    y = [y[i::a] for i in range(a)]
+  else:
+    y = [np.pad(y, (0, max(0, sr - len(y))), "constant")]
+
+  return y, sr
 
 def split_silence(y):
   win_length = int(param.get('win_length') * param.get('sample_rate'))
@@ -217,16 +248,27 @@ def split_silence(y):
 
   return start, end
 
-def save_hdf(file, label, arr):
+def save_hdf(file, arr):
   h5f = h5py.File(file, 'w')
   h5f.create_dataset('feature', data=arr)
   h5f.close()
+
+def get_window(win_len, win_type):
+  if win_type == 'hamming_asymmetric':
+      return scipy.signal.hamming(win_len, sym=False)
+  elif win_type == 'hamming_symmetric':
+      return scipy.signal.hamming(win_len, sym=True)
+  elif win_type == 'hann_asymmetric':
+      return scipy.signal.hann(win_len, sym=False)
+  elif win_type == 'hann_symmetric':
+      return scipy.signal.hann(win_len, sym=True)
 
 def get_mel(y):
   win_length = int(param.get('win_length') * param.get('sample_rate'))
   hop_length = int(param.get('hop_length') * param.get('sample_rate'))
 
-  window_ = scipy.signal.hamming(win_length, sym=False)
+  window_ = get_window(win_length, param.get('window'))
+
   mel_basis = librosa.filters.mel(
         sr=param.get('sample_rate'),
         n_fft=param.get('n_fft'),
@@ -254,8 +296,8 @@ def get_mel(y):
 def get_mfcc(y):
   win_length = int(param.get('win_length') * param.get('sample_rate'))
   hop_length = int(param.get('hop_length') * param.get('sample_rate'))
-  
-  window_ = scipy.signal.hamming(win_length, sym=False)
+
+  window_ = get_window(win_length, param.get('window'))
 
   mel_basis = librosa.filters.mel(
       sr=param.get('sample_rate'),
@@ -281,7 +323,6 @@ def get_mfcc(y):
       S=librosa.logamplitude(mel_spectrum),
       n_mfcc=param.get('n_mfcc')
   )
-  
   return mfcc.T
 
 def get_mfcc_delta(mfcc):
