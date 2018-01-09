@@ -186,8 +186,7 @@ def load_audio(file_path):
       a = len(y) // sr
       y = y[:sr * a]
     else:
-      y = [np.pad(y, (0, max(0, sr - len(y))), "constant")]
-
+      y = np.pad(y, (0, max(0, sr - len(y))), "constant")
     return y, sr
   except Exception as e:
     print(file_path)
