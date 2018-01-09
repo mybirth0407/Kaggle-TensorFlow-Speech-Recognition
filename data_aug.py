@@ -66,7 +66,7 @@ def do_aug(file_path):
 
 def add_white_noise(file_path, y, sr):
   # Adding white noise 
-  new_y = np.array(y, dtype=np.float)
+  new_y = y
   start, end = split_silence(y)
 
   # add noise
@@ -100,7 +100,7 @@ def add_white_noise(file_path, y, sr):
     )
 
 def amp_sound(file_path, y, sr):
-  new_y = np.array(y, dtype=np.float)
+  new_y = y
   new_y = y * 1.5
 
   file_path = file_path.replace('train', 'augmentation')
@@ -124,7 +124,7 @@ def amp_sound(file_path, y, sr):
 
 def shift_sound_right(file_path, y, sr):
   # Adding white noise 
-  new_y = np.array(y, dtype=np.float)
+  new_y = y
   start, end = split_silence(y)
 
   # add noise
@@ -185,7 +185,6 @@ def load_audio(file_path):
     if len(y) > sr:
       a = len(y) // sr
       y = y[:sr * a]
-      y = [y[i::a] for i in range(len(y))]
     else:
       y = [np.pad(y, (0, max(0, sr - len(y))), "constant")]
 
