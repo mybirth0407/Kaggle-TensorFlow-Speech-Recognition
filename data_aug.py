@@ -85,12 +85,14 @@ def add_white_noise(file_path, y, sr):
   if not isdir('./augmentation/audio/' + label):
     if label == '_background_noise_':
       label = 'silence'
+      file_path = file_path.replace('_background_noise_', label)
     mkdir('./augmentation/audio/' + label)
   path = cur_dir.replace('train', 'augmentation')
   file = os.path.basename(os.path.normpath(file_path))
   file, ext = os.path.splitext(file)
   file += '_wn' + ext
   fname = os.path.join(path, file)
+
 
   if isfile(fname):
     return
@@ -108,6 +110,9 @@ def amp_sound(file_path, y, sr):
   cur_dir = os.path.dirname(file_path)
   label = os.path.basename(os.path.normpath(cur_dir))
   if not isdir('./augmentation/audio/' + label):
+    if label == '_background_noise_':
+      label = 'silence'
+      file_path = file_path.replace('_background_noise_', label)
     mkdir('./augmentation/audio/' + label)
   path = cur_dir.replace('train', 'augmentation')
   file = os.path.basename(os.path.normpath(file_path))
@@ -145,6 +150,9 @@ def shift_sound_right(file_path, y, sr):
   cur_dir = os.path.dirname(file_path)
   label = os.path.basename(os.path.normpath(cur_dir))
   if not isdir('./augmentation/audio/' + label):
+    if label == '_background_noise_':
+      label = 'silence'
+      file_path = file_path.replace('_background_noise_', label)
     mkdir('./augmentation/audio/' + label)
   path = cur_dir.replace('train', 'augmentation')
   file = os.path.basename(os.path.normpath(file_path))
@@ -165,6 +173,9 @@ def shift_sound_left(file_path, y, sr):
   cur_dir = os.path.dirname(file_path)
   label = os.path.basename(os.path.normpath(cur_dir))
   if not isdir('./augmentation/audio/' + label):
+    if label == '_background_noise_':
+      label = 'silence'
+      file_path = file_path.replace('_background_noise_', label)
     mkdir('./augmentation/audio/' + label)
   path = cur_dir.replace('train', 'augmentation')
   file = os.path.basename(os.path.normpath(file_path))
