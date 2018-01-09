@@ -27,6 +27,8 @@ import matplotlib.pyplot as plt
 # Use Os Function.
 import os
 from os import listdir
+from os import mkdir
+from os.path import isdir
 # Using Data Processing for Multiprocessing.
 import multiprocessing
 from multiprocessing import Pool
@@ -75,13 +77,9 @@ def main(argv):
   print('model constructing!')
   model = Sequential()
   model.add(Conv2D(32, (3, 3), activation = 'relu', input_shape=input_shape))
-
   model.add(MaxPooling2D(pool_size=(2, 2)))
-
   model.add(Conv2D(32, (3, 3), activation = 'relu'))
-
   model.add(MaxPooling2D(pool_size=(2, 2)))
-
   model.add(Flatten())
   model.add(Dense(100))
   model.add(BatchNormalization())
@@ -96,13 +94,6 @@ def main(argv):
   )
   model.summary()
   print('model constructing done!')
-
-###############################################################################
-
-  print('model save!')
-  import time
-  model.save('cnn_model_' + str(time.time()) + '.h5')
-  print('model save done!')
 
 ###############################################################################
 
@@ -125,7 +116,12 @@ def main(argv):
   
 ###############################################################################
 
-
+  print('model save!')
+  import time
+  if not isdir('./model'):
+    mkdir('./model')
+  model.save('./model/cnn_model_all_' + str(time.time()) + '.h5')
+  print('model save done!')
 
 ###############################################################################
 
