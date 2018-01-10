@@ -31,13 +31,6 @@ for (i, label) in zip(range(len(except_label)), except_label):
 for (i, label) in zip(range(n_except, len(meaningful_label)), meaningful_label):
   meaningful_label_dict[label] = i
 
-# 31 class
-# meaningful_label = listdir('./feature/train/train')
-# meaningful_label.sort()
-# meaningful_label_dict = {}
-# for (i, label) in zip(range(len(meaningful_label)), meaningful_label):
-#   meaningful_label_dict[label] = i
-  
 
 def map_func(x):
   if x in meaningful_label_dict.keys():

@@ -25,7 +25,7 @@ import h5py
 def main(argv):
 ###############################################################################
 
-  epochs = 200
+  epochs = 20
   batch_size = 256
 
 ###############################################################################
@@ -83,7 +83,7 @@ def main(argv):
   now = time.localtime()
   time_stamp = '%02d%02d%02d' % (now.tm_mday, now.tm_hour, now.tm_min)
   save_dir = os.path.join(os.getcwd(), 'saved_models_' + time_stamp)
-  model_name = 'resnet_v2_model.{epoch:03d}.h5'
+  model_name = 'resnet_v' + argv[2] + '_model.{epoch:03d}.h5'
 
   if not isdir(save_dir):
     mkdir(save_dir)

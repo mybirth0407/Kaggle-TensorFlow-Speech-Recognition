@@ -9,6 +9,7 @@ from keras.preprocessing.image import ImageDataGenerator
 from keras.regularizers import l2
 from keras import backend as K
 from keras.models import Model
+from keras.models import load_model
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
@@ -24,7 +25,7 @@ import h5py
 def main(argv):
 ###############################################################################
 
-  epochs = 20
+  epochs = 2
   batch_size = 256
 
 ###############################################################################
@@ -54,17 +55,27 @@ def main(argv):
 
 ###############################################################################
 
+  print('model constructing!')
   print(x_val.shape[1])
   print(y_val.shape[1])
   input_shape = (51, 39, 1)
 
   n = 3
-  depth = n * 9 + 2
-  model = resnet_v2(input_shape=input_shape, depth=depth, num_classes=12)
-  model.compile(loss='categorical_crossentropy',
-              optimizer=Adam(lr=lr_schedule(0)),
-              metrics=['accuracy'])
-  model.summary()
+  if argv[2] == '1':
+    depth = n * 6 + 2
+    model = resnet_v1(input_shape=input_shape, depth=depth, num_classes=12)
+  elif argv[2] == '2':
+    depth = n * 9 + 2
+    model = resnet_v2(input_shape=input_shape, depth=depth, num_classes=12)
+  try:
+    model = load_model(argv[3])
+  
+  except:
+    model.compile(loss='categorical_crossentropy',
+                optimizer=Adam(lr=lr_schedule(0)),
+                metrics=['accuracy'])
+    model.summary()
+    print('model constructing done!')
 
 ###############################################################################
 
@@ -73,7 +84,7 @@ def main(argv):
   now = time.localtime()
   time_stamp = '%02d%02d%02d' % (now.tm_mday, now.tm_hour, now.tm_min)
   save_dir = os.path.join(os.getcwd(), 'saved_models_' + time_stamp)
-  model_name = 'resnet_v2_model.{epoch:03d}.h5'
+  model_name = 'resnet_v' + argv[2] + '_model.{epoch:03d}.h5'
 
   if not isdir(save_dir):
     mkdir(save_dir)
@@ -333,13 +344,72 @@ def resnet_v2(input_shape, depth, num_classes=10):
     model = Model(inputs=inputs, outputs=outputs)
     return model
 
+def resnet_v1(input_shape, depth, num_classes=10):
+    """ResNet Version 1 Model builder [a]
+    Stacks of 2 x (3 x 3) Conv2D-BN-ReLU
+    Last ReLU is after the shortcut connection.
+    The number of filters doubles when the feature maps size
+    is halved.
+    The Number of parameters is approx the same as Table 6 of [a]:
+    ResNet20 0.27M
+    ResNet32 0.46M
+    ResNet44 0.66M
+    ResNet56 0.85M
+    ResNet110 1.7M
+    # Arguments
+        input_shape (tensor): shape of input image tensor
+        depth (int): number of core convolutional layers
+        num_classes (int): number of classes (CIFAR10 has 10)
+    # Returns
+        model (Model): Keras model instance
+    """
+    if (depth - 2) % 6 != 0:
+        raise ValueError('depth should be 6n+2 (eg 20, 32, 44 in [a])')
+    # Start model definition.
+    inputs = Input(shape=input_shape)
+    num_filters = 16
+    num_sub_blocks = int((depth - 2) / 6)
 
+    x = resnet_block(inputs=inputs)
+    # Instantiate convolutional base (stack of blocks).
+    for i in range(3):
+        for j in range(num_sub_blocks):
+            strides = 1
+            is_first_layer_but_not_first_block = j == 0 and i > 0
+            if is_first_layer_but_not_first_block:
+                strides = 2
+            y = resnet_block(inputs=x,
+                             num_filters=num_filters,
+                             strides=strides)
+            y = resnet_block(inputs=y,
+                             num_filters=num_filters,
+                             activation=None)
+            if is_first_layer_but_not_first_block:
+                x = resnet_block(inputs=x,
+                                 num_filters=num_filters,
+                                 kernel_size=1,
+                                 strides=strides,
+                                 activation=None,
+                                 batch_normalization=False)
+            x = keras.layers.add([x, y])
+            x = Activation('relu')(x)
+        num_filters = 2 * num_filters
+
+    # Add classifier on top.
+    # v1 does not use BN after last shortcut connection-ReLU
+    x = AveragePooling2D(pool_size=8)(x)
+    y = Flatten()(x)
+    outputs = Dense(num_classes,
+                    activation='softmax',
+                    kernel_initializer='he_normal')(y)
+
+    # Instantiate model.
+    model = Model(inputs=inputs, outputs=outputs)
+
+    return model
 
 def stop():
   while True: pass
 
-
-
 if __name__ == '__main__':
   main(sys.argv)
-
