@@ -125,19 +125,6 @@ def main(argv):
 
 ###############################################################################
 
-  # print('model evaluate!')
-  # x_test, y_test = get_feature_mode('test', test_list)
-  # x_test = x_test.reshape(x_test.shape[0], 51, 39, 1)
-  # # predict = model.predict(x_test, batch_size=batch_size)
-  # score = model.evaluate(x_test, y_test, batch_size=batch_size)
-  # print('model evaluate done!')
-
-###############################################################################
-
-  # print(score)
-  # print('\n%s: %.2f%%' % (model.metrics_names[1], score[1] * 100))
-
-
 def generate_file(file_list, batch_size):
   shuffle(file_list)
   while True:

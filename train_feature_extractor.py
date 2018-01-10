@@ -14,21 +14,21 @@ import json
 import shutil
 
 # audio paths
-train_audio_path = '../train/audio/'
+train_audio_path = './train/audio/'
 train_feature_path = './feature/train/'
 try:
   if sys.argv[2] == 'aug':
     print('augmentation data')
     if not isdir('./feature/augmentation'):
       mkdir('./feature/augmentation')
-    train_audio_path = '../augmentation/audio/'
+    train_audio_path = './augmentation/audio/'
     train_feature_path = './feature/augmentation/train/'
 except Exception as e:
   print(e)
 
 # information file
-validation_file = '../train/validation_list.txt'
-testing_file = '../train/testing_list.txt'
+validation_file = './train/validation_list.txt'
+testing_file = './train/testing_list.txt'
 if not isdir('./feature'):
   mkdir('./feature')
 if not isdir(train_feature_path):
