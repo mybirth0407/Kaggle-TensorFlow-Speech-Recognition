@@ -2,6 +2,7 @@ from __future__ import print_function
 import keras
 from keras.layers import Dense, Conv2D, BatchNormalization, Activation
 from keras.layers import AveragePooling2D, Input, Flatten
+from keras.models import load_model
 from keras.optimizers import Adam
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
 from keras.callbacks import ReduceLROnPlateau
@@ -128,7 +129,7 @@ def main(argv):
   print('model fit done!')
   
 ###############################################################################
-
+    
   print('model evaluate!')
   x_test, y_test = get_feature_mode('test', test_list)
   x_test = x_test.reshape(x_test.shape[0], 51, 39, 1)

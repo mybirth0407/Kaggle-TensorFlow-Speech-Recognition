@@ -24,7 +24,7 @@ import h5py
 def main(argv):
 ###############################################################################
 
-  epochs = 200
+  epochs = 20
   batch_size = 256
 
 ###############################################################################
@@ -102,7 +102,7 @@ def main(argv):
   
   model.fit_generator(
       generator=generate_file(train_list, batch_size),
-      steps_per_epoch=577,
+      steps_per_epoch=630,
       validation_data=(x_val, y_val),
       validation_steps=y_val.shape[0] // batch_size,
       epochs=epochs,
