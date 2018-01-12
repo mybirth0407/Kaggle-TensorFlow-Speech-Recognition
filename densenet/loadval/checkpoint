@@ -1,0 +1,2 @@
+model_checkpoint_path: "densenet_model_2018-01-11T14:33:07_optimal.ckpt"
+all_model_checkpoint_paths: "densenet_model_2018-01-11T14:33:07_optimal.ckpt"
