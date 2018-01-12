@@ -95,13 +95,11 @@ if __name__ == '__main__':
   n = 100
   file_list = [file_list[i::n] for i in range(n)]
 
-  if not isdir('./pred'):
-    mkdir('./pred')
-
   import time
-  # f = open('./pred/pred_' + str(time.time()) +  '.csv', 'w')
-  pred_file, _ = os.path.splitext(sys.argv[1])
-  pred_file = os.path.join('./pred/', pred_file)
+  base_name = os.path.basename(sys.argv[1])
+  pred_file = os.path.basename(os.path.normpath(sys.argv[1]))
+  pred_file, _ = os.path.splitext(pred_file)
+  pred_file = os.path.join(base_name, pred_file)
   f = open(pred_file + '.csv', 'w')
   f.write('fname,label\n')
 
