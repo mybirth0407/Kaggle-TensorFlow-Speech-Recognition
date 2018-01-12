@@ -301,7 +301,7 @@ def shift_sound_right(file_path, y, sr):
     )
 
 def shift_sound_left(file_path, y, sr):
-  new_y = np.roll(y, int(-sr / 5))
+  new_y = np.roll(y, int(sr / 5))
 
   cur_dir = os.path.dirname(file_path)
   label = os.path.basename(os.path.normpath(cur_dir))
