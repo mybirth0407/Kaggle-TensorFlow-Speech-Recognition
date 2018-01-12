@@ -43,6 +43,14 @@ class_num = 12
 
 total_epochs = 2 #12
 
+epochs = 12
+batch_size = 256
+frame_size = 51
+use_mfcc = 39
+use_mel = 40
+
+
+
 # Densenet Network Design
 
 def conv_layer(input, filter, kernel, stride=1, layer_name="conv"):
@@ -194,11 +202,6 @@ class DenseNet():
 def main(argv):
 ###############################################################################
 
-    epochs = 12
-    batch_size = 256
-
-###############################################################################
-
     print('data loading!')
     file_list = listdir(argv[1])
     shuffle(file_list)
@@ -218,7 +221,7 @@ def main(argv):
     file_list = None
 
     x_val, y_val = get_feature_mode('val', val_list)
-    x_val = x_val.reshape(x_val.shape[0], 51, 39, 1)
+    x_val = x_val.reshape(x_val.shape[0], frame_size, use_mfcc, 1)
     print("x_val.shape: ", x_val.shape)
     print("y_val.shape: ", y_val.shape)
 
@@ -226,7 +229,7 @@ def main(argv):
 
 ###############################################################################
 
-    X = tf.placeholder(tf.float32, shape=[None, 51, 39, 1])
+    X = tf.placeholder(tf.float32, shape=[None, frame_size, use_mfcc, 1])
     label = tf.placeholder(tf.float32, shape=[None, 12])
 
     training_flag = tf.placeholder(tf.bool)
@@ -330,7 +333,7 @@ def main(argv):
 
         print('model evaluate!')
         x_test, y_test = get_feature_mode('test', test_list)
-        x_test = x_test.reshape(x_test.shape[0], 51, 39, 1)
+        x_test = x_test.reshape(x_test.shape[0], frame_size, use_mfcc, 1)
         test_feed_dict = {
             X: x_test,
             label: y_test,
@@ -351,9 +354,9 @@ def generate_file(file_list, batch_size):
     while True:
         for file in file_list:
             h5f = h5py.File(file, 'r')
-            feature = h5f['feature'][:]
-            feature = feature.reshape(feature.shape[0], 51, 39, 1)
-            label = h5f['label'][:]
+            feature = h5f['feature'][:, :use_mfcc]
+            feature = feature.reshape(feature.shape[0], frame_size, use_mfcc, 1)
+            label = h5f['label'][:, :use_mfcc]
             h5f.close()
             # gc plz..
             i = 0
@@ -404,7 +407,7 @@ def get_feature_file_list(file_list):
 def get_feature_file(file):
     print(file + ' start!')
     h5f = h5py.File(file, 'r')
-    feature = h5f['feature'][:]
+    feature = h5f['feature'][:, :use_mfcc]
     label = h5f['label'][:] 
     h5f.close()
     print(file + ' done!')

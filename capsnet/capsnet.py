@@ -161,7 +161,7 @@ def generate_file(file_list, batch_size):
   while True:
     for file in file_list:
       h5f = h5py.File(file, 'r')
-      feature = h5f['feature'][:]
+      feature = h5f['feature'][:, :39]
       feature = feature.reshape(feature.shape[0], frame_size, use_mfcc, 1)
       label = h5f['label'][:]
       h5f.close()
@@ -214,7 +214,7 @@ def get_feature_file_list(file_list):
 def get_feature_file(file):
   print(file + ' start!')
   h5f = h5py.File(file, 'r')
-  feature = h5f['feature'][:]
+  feature = h5f['feature'][:, :39]
   label = h5f['label'][:] 
   h5f.close()
   print(file + ' done!')
