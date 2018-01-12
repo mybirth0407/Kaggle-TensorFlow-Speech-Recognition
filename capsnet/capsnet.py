@@ -1,57 +1,55 @@
-# Keras metrics method
-from keras import metrics
-# Keras perceptron neuron layer implementation.
-from keras.layers import Dense
-# Keras Convolution
-from keras.layers import Conv2D
-from keras.layers import MaxPooling2D
-from keras.layers import Flatten
-# Keras Dropout layer implementation.
-from keras.layers import Dropout
-# Keras Activation Function layer implementation.
-from keras.layers import Activation
-# Keras Batch normalization
-from keras.layers.normalization import BatchNormalization
-# Keras Model object.
-from keras.models import Sequential
-# Keras Optimizer for custom user.
-from keras import optimizers
-# Keras Loss for custom user.
-from keras import losses
-# Numeric Python Library.
+"""
+Keras implementation of CapsNet in Hinton's paper Dynamic Routing Between Capsules.
+The current version maybe only works for TensorFlow backend. Actually it will be straightforward to re-write to TF code.
+Adopting to other backends should be easy, but I have not tested this. 
+Usage:
+     python capsulenet.py
+     python capsulenet.py --epochs 50
+     python capsulenet.py --epochs 50 --routings 3
+     ... ...
+     
+Result:
+  Validation accuracy > 99.5% after 20 epochs. Converge to 99.66% after 50 epochs.
+  About 110 seconds per epoch on a single GTX1070 GPU card
+  
+Author: Xifeng Guo, E-mail: `guoxifeng1990@163.com`, Github: `https://github.com/XifengGuo/CapsNet-Keras`
+"""
+
 import numpy as np
-# Get System Argument.
+from keras import layers, models
+from keras.optimizers import Adam
+from keras import backend as K
+from keras.utils import to_categorical
+from capsulelayers import CapsuleLayer, PrimaryCap, Length, Mask
+from keras.callbacks import ModelCheckpoint, LearningRateScheduler
+
+import numpy as np
 import sys
-# Use plot.
 import matplotlib.pyplot as plt
-# Use Os Function.
 import os
 from os import listdir
 from os import mkdir
 from os.path import isdir
-# Using Data Processing for Multiprocessing.
 import multiprocessing
 from multiprocessing import Pool
-# Use List Random Shuffle. 
 from random import shuffle
-# Use HDF File Format.
 import h5py
 
-from keras.optimizers import Adam
-from keras.callbacks import ModelCheckpoint, LearningRateScheduler
-from keras.callbacks import ReduceLROnPlateau
-
-epochs = 12
+epochs = 20
 batch_size = 256
 frame_size = 51
 use_mel = 40
 use_mfcc = 39
+routings = 3
+n_classes = 12
+recon = 0.392
+lr = 0.001
+decay = 0.9
 
 def main(argv):
 ###############################################################################
 
   print('data loading!')
-
   file_list = listdir(argv[1])
   shuffle(file_list)
 
@@ -79,53 +77,23 @@ def main(argv):
 ###############################################################################
 
   print('model constructing!')
-  
   print(x_val.shape[1])
   print(y_val.shape[1])
   input_shape = (frame_size, use_mfcc, 1)
-  # model = Sequential()
-  # model.add(Conv2D(32, (3, 3), activation = 'relu', input_shape=input_shape))
-  # model.add(MaxPooling2D(pool_size=(2, 2)))
-  # model.add(Conv2D(32, (3, 3), activation = 'relu'))
-  # model.add(MaxPooling2D(pool_size=(2, 2)))
-  # model.add(Flatten())
-  # model.add(Dense(100))
-  # model.add(BatchNormalization())
-  # model.add(Activation('relu'))
-  # model.add(Dense(100))
-  # model.add(BatchNormalization())
-  # model.add(Activation('relu'))
-  # model.add(Dense(12, activation = 'softmax')) #Last layer with one output per class
 
-  model = Sequential()
-  model.add(Conv2D(32, (3, 3), padding='same', input_shape=input_shape))
-  model.add(Activation('relu'))
-  model.add(Conv2D(32, (3, 3)))
-  model.add(Activation('relu'))
-  model.add(MaxPooling2D(pool_size=(2, 2)))
-  model.add(Dropout(0.25))
 
-  model.add(Conv2D(64, (3, 3), padding='same'))
-  model.add(Activation('relu'))
-  model.add(Conv2D(64, (3, 3)))
-  model.add(Activation('relu'))
-  model.add(MaxPooling2D(pool_size=(2, 2)))
-  model.add(Dropout(0.25))
+  # define model
+  model = CapsNet(input_shape=input_shape, n_class=n_classes, routings=routings)
+  model.summary()
 
-  model.add(Flatten())
-  model.add(Dense(512))
-  model.add(Activation('relu'))
-  model.add(Dropout(0.5))
-  model.add(Dense(12))
-  model.add(Activation('softmax'))
-  
+  # compile the model
   model.compile(
-      loss='categorical_crossentropy',
-      optimizer=Adam(lr=lr_schedule(0)),
-      metrics=["accuracy"]
+      optimizer=Adam(lr=lr),
+      loss=[margin_loss, 'mse'],
+      loss_weights=[1., recon],
+      metrics={'capsnet': 'accuracy'}
   )
 
-  model.summary()
   print('model constructing done!')
 
 ###############################################################################
@@ -135,7 +103,7 @@ def main(argv):
   now = time.localtime()
   time_stamp = '%02d%02d%02d' % (now.tm_mday, now.tm_hour, now.tm_min)
   save_dir = os.path.join(os.getcwd(), 'saved_models_' + time_stamp)
-  model_name = 'cnn_model.{epoch:03d}.h5'
+  model_name = 'capsnet_model.{epoch:03d}.h5'
 
   if not isdir(save_dir):
     mkdir(save_dir)
@@ -147,21 +115,20 @@ def main(argv):
                                verbose=1,
                                save_best_only=True)
 
-  lr_scheduler = LearningRateScheduler(lr_schedule)
+  # callbacks
 
-  lr_reducer = ReduceLROnPlateau(factor=np.sqrt(0.1),
-                                 cooldown=0,
-                                 patience=5,
-                                 min_lr=0.5e-6)
+  lr_decay = LearningRateScheduler(
+      schedule=lambda epoch: lr * (decay ** epoch)
+  )
 
-  callbacks = [checkpoint, lr_reducer, lr_scheduler]
+  callbacks = [checkpoint, lr_decay]
 
   print('callback define done!')
 
 ###############################################################################
 
   print('model fit!')
-
+  
   model.fit_generator(
       generator=generate_file(train_list, batch_size),
       steps_per_epoch=1547,
@@ -177,44 +144,17 @@ def main(argv):
   # gc
   x_val = None
   y_val = None
+
   print('model fit done!')
   
 ###############################################################################
-
+    
   print('model evaluate!')
   x_test, y_test = get_feature_mode('test', test_list)
   x_test = x_test.reshape(x_test.shape[0], frame_size, use_mfcc, 1)
   # predict = model.predict(x_test, batch_size=batch_size)
   score = model.evaluate(x_test, y_test, batch_size=batch_size)
   print('model evaluate done!')
-
-###############################################################################
-
-  print(score)
-  print('\n%s: %.2f%%' % (model.metrics_names[1], score[1] * 100))
-
-
-def lr_schedule(epoch):
-    """Learning Rate Schedule
-    Learning rate is scheduled to be reduced after 80, 120, 160, 180 epochs.
-    Called automatically every epoch as part of callbacks during training.
-    # Arguments
-        epoch (int): The number of epochs
-    # Returns
-        lr (float32): learning rate
-    """
-    lr = 1e-3
-    if epoch > 180:
-        lr *= 0.5e-3
-    elif epoch > 160:
-        lr *= 1e-3
-    elif epoch > 120:
-        lr *= 1e-2
-    elif epoch > 80:
-        lr *= 1e-1
-    print('Learning rate: ', lr)
-
-    return lr
 
 def generate_file(file_list, batch_size):
   shuffle(file_list)
@@ -281,9 +221,60 @@ def get_feature_file(file):
 
   return (feature, label)
 
-def stop():
-  while True: pass
+def CapsNet(input_shape, n_class, routings):
+  """
+  A Capsule Network on MNIST.
+  :param input_shape: data shape, 3d, [width, height, channels]
+  :param n_class: number of classes
+  :param routings: number of routing iterations
+  :return: Two Keras Models, the first one used for training, and the second one for evaluation.
+      `eval_model` can also be used for training.
+  """
+  x = layers.Input(shape=input_shape)
 
-if __name__ == '__main__':
+  # Layer 1: Just a conventional Conv2D layer
+  conv1 = layers.Conv2D(filters=256, kernel_size=9, strides=1, padding='valid', activation='relu', name='conv1')(x)
+
+  # Layer 2: Conv2D layer with `squash` activation, then reshape to [None, num_capsule, dim_capsule]
+  primarycaps = PrimaryCap(conv1, dim_capsule=8, n_channels=32, kernel_size=9, strides=2, padding='valid')
+
+  # Layer 3: Capsule layer. Routing algorithm works here.
+  digitcaps = CapsuleLayer(num_capsule=n_class, dim_capsule=16, routings=routings,
+               name='digitcaps')(primarycaps)
+
+  # Layer 4: This is an auxiliary layer to replace each capsule with its length. Just to match the true label's shape.
+  # If using tensorflow, this will not be necessary. :)
+  out_caps = Length(name='capsnet')(digitcaps)
+
+  # Decoder network.
+  y = layers.Input(shape=(n_class,))
+  masked_by_y = Mask()([digitcaps, y])  # The true label is used to mask the output of capsule layer. For training
+  masked = Mask()(digitcaps)  # Mask using the capsule with maximal length. For prediction
+
+  # Shared Decoder model in training and prediction
+  decoder = models.Sequential(name='decoder')
+  decoder.add(layers.Dense(512, activation='relu', input_dim=16*n_class))
+  decoder.add(layers.Dense(1024, activation='relu'))
+  decoder.add(layers.Dense(np.prod(input_shape), activation='sigmoid'))
+  decoder.add(layers.Reshape(target_shape=input_shape, name='out_recon'))
+
+  # Models for training and evaluation (prediction)
+  train_model = models.Model([x, y], [out_caps, decoder(masked_by_y)])
+
+  return train_model
+
+
+def margin_loss(y_true, y_pred):
+  """
+  Margin loss for Eq.(4). When y_true[i, :] contains not just one `1`, this loss should work too. Not test it.
+  :param y_true: [None, n_classes]
+  :param y_pred: [None, num_capsule]
+  :return: a scalar loss value.
+  """
+  L = y_true * K.square(K.maximum(0., 0.9 - y_pred)) + \
+    0.5 * (1 - y_true) * K.square(K.maximum(0., y_pred - 0.1))
+
+  return K.mean(K.sum(L, 1))
+
+if __name__ == "__main__":
   main(sys.argv)
-

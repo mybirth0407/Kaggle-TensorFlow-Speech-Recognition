@@ -92,6 +92,7 @@ def get_train_feature_extract(val_list, test_list):
 
   try:
     if sys.argv[2] == 'aug':
+      print('augmentation feature extractor done!')
       return
   except Exception as e:
     print(e)
@@ -176,33 +177,25 @@ def get_feature(file, label):
     
   try:
     y, sr = load_audio(file)
-    # start, end = split_silence(y)
-    # mel = get_mel(y)
-    # mel = get_mel(y)[start:end]
     mfcc = get_mfcc(y[0])
+    mel = get_mel(y[0])
+
     for i in range(1, len(y)):
       mfcc = np.vstack((mfcc, get_mfcc(y[i])))
-    # mfcc_del = get_mfcc_delta(mfcc)
-    # mfcc_acc = get_mfcc_acceleration(mfcc)
-    # print(mel.shape)
-    # print(mfcc.shape)
-    # print(mfcc_del.shape)
-    # print(mfcc_acc.shape)
+      mel = np.vstack((mel, get_mel(y[i])))
 
   except Exception as e:
     print(e)
     return
 
-  # 1 + len(mel[0]) ...
+  # mfcc = 39, mel = 40
   # 1 is label location
   feature_vector = np.empty((
-      0, 1 + len(mfcc[0])
+      0, 1 + len(mfcc[0]) + len(mel[0])
   ))
 
   for i in range(len(mfcc)):
-    feature = np.hstack(
-        [mfcc[i], str.encode(label)]
-    )
+    feature = np.hstack([mfcc[i], mel[i], str.encode(label)])
     feature_vector = np.vstack((feature_vector, feature))
 
   save_hdf(file_test, feature_vector)
@@ -296,7 +289,6 @@ def get_mel(y):
 def get_mfcc(y):
   win_length = int(param.get('win_length') * param.get('sample_rate'))
   hop_length = int(param.get('hop_length') * param.get('sample_rate'))
-
   window_ = get_window(win_length, param.get('window'))
 
   mel_basis = librosa.filters.mel(
@@ -324,23 +316,6 @@ def get_mfcc(y):
       n_mfcc=param.get('n_mfcc')
   )
   return mfcc.T
-
-def get_mfcc_delta(mfcc):
-  delta = librosa.feature.delta(mfcc, param.get('width'))
-
-  # mfcc is already .T
-  return delta
-
-def get_mfcc_acceleration(mfcc):
-  acceleration = librosa.feature.delta(
-      mfcc,
-      order=2,
-      width=param.get('width')
-  )
-
-  # mfcc is already .T
-  return acceleration
-
 
 if __name__ == '__main__':
   main(sys.argv)

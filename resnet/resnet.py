@@ -22,12 +22,13 @@ from multiprocessing import Pool
 from random import shuffle
 import h5py
 
+epochs = 20
+batch_size = 256
+frame_size = 51
+use_mel = 40
+use_mfcc = 39
+
 def main(argv):
-###############################################################################
-
-  epochs = 20
-  batch_size = 256
-
 ###############################################################################
 
   print('data loading!')
@@ -49,7 +50,7 @@ def main(argv):
   file_list = None
 
   x_val, y_val = get_feature_mode('val', val_list)
-  x_val = x_val.reshape(x_val.shape[0], 51, 39, 1)
+  x_val = x_val.reshape(x_val.shape[0], frame_size, use_mfcc, 1)
   print(x_val.shape)
   print(y_val.shape)
 
@@ -60,7 +61,7 @@ def main(argv):
   print('model constructing!')
   print(x_val.shape[1])
   print(y_val.shape[1])
-  input_shape = (51, 39, 1)
+  input_shape = (frame_size, use_mfcc, 1)
 
   n = 3
   if argv[2] == '1':
@@ -112,7 +113,7 @@ def main(argv):
   
   model.fit_generator(
       generator=generate_file(train_list, batch_size),
-      steps_per_epoch=577,
+      steps_per_epoch=1547,
       validation_data=(x_val, y_val),
       validation_steps=y_val.shape[0] // batch_size,
       epochs=epochs,
@@ -132,7 +133,7 @@ def main(argv):
     
   print('model evaluate!')
   x_test, y_test = get_feature_mode('test', test_list)
-  x_test = x_test.reshape(x_test.shape[0], 51, 39, 1)
+  x_test = x_test.reshape(x_test.shape[0], frame_size, use_mfcc, 1)
   # predict = model.predict(x_test, batch_size=batch_size)
   score = model.evaluate(x_test, y_test, batch_size=batch_size)
   print('model evaluate done!')
@@ -148,7 +149,7 @@ def generate_file(file_list, batch_size):
     for file in file_list:
       h5f = h5py.File(file, 'r')
       feature = h5f['feature'][:]
-      feature = feature.reshape(feature.shape[0], 51, 39, 1)
+      feature = feature.reshape(feature.shape[0], frame_size, use_mfcc, 1)
       label = h5f['label'][:]
       h5f.close()
       # gc plz..

@@ -14,6 +14,7 @@ from keras.layers import Activation
 from keras.layers.normalization import BatchNormalization
 # Keras Model object.
 from keras.models import Sequential
+from keras.models import load_model
 # Keras Optimizer for custom user.
 from keras import optimizers
 # Keras Loss for custom user.
@@ -37,16 +38,21 @@ from random import shuffle
 # Use HDF File Format.
 import h5py
 
+from keras.optimizers import Adam
+from keras.callbacks import ModelCheckpoint, LearningRateScheduler
+from keras.callbacks import ReduceLROnPlateau
+
+epochs = 6
+batch_size = 256
+frame_size = 51
+use_mel = 40
+use_mfcc = 39
 
 def main(argv):
 ###############################################################################
 
-  epochs = 10
-  batch_size = 256
-
-###############################################################################
-
   print('data loading!')
+
   file_list = listdir(argv[1])
   shuffle(file_list)
 
@@ -63,7 +69,7 @@ def main(argv):
   file_list = None
 
   x_val, y_val = get_feature_mode('val', val_list)
-  x_val = x_val.reshape(x_val.shape[0], 51, 39, 1)
+  x_val = x_val.reshape(x_val.shape[0], frame_size, use_mfcc, 1)
   print(x_val.shape)
   print(y_val.shape)
 
@@ -71,42 +77,57 @@ def main(argv):
 
 ###############################################################################
 
+  print('model loading!')
+
   print(x_val.shape[1])
   print(y_val.shape[1])
-  input_shape = (51, 39, 1)
-  print('model constructing!')
-  model = Sequential()
-  model.add(Conv2D(32, (3, 3), activation = 'relu', input_shape=input_shape))
-  model.add(MaxPooling2D(pool_size=(2, 2)))
-  model.add(Conv2D(32, (3, 3), activation = 'relu'))
-  model.add(MaxPooling2D(pool_size=(2, 2)))
-  model.add(Flatten())
-  model.add(Dense(100))
-  model.add(BatchNormalization())
-  model.add(Activation('relu'))
-  model.add(Dense(100))
-  model.add(BatchNormalization())
-  model.add(Activation('relu'))
-  model.add(Dense(12, activation = 'softmax')) #Last layer with one output per class
+  input_shape = (frame_size, use_mfcc, 1)
+  model = load_model(argv[2])
 
-  model.compile(
-      loss='categorical_crossentropy', optimizer='adam', metrics=["accuracy"]
-  )
-  model.summary()
-  print('model constructing done!')
+  print('model loading done!')
+
+###############################################################################
+
+  print('callback define!')
+  time_stamp = os.path.dirname(argv[2])
+  save_dir = os.path.join(os.getcwd(), 'saved_models_' + time_stamp[-6:])
+  model_name = 'cnn_model_all.{epoch:03d}.h5'
+
+  if not isdir(save_dir):
+    mkdir(save_dir)
+  filepath = os.path.join(save_dir, model_name)
+
+  # Prepare callbacks for model saving and for learning rate adjustment.
+  checkpoint = ModelCheckpoint(filepath=filepath,
+                               monitor='acc',
+                               verbose=1,
+                               save_best_only=True)
+
+  lr_scheduler = LearningRateScheduler(lr_schedule)
+
+  lr_reducer = ReduceLROnPlateau(factor=np.sqrt(0.1),
+                                 cooldown=0,
+                                 patience=5,
+                                 min_lr=0.5e-6)
+
+  callbacks = [checkpoint, lr_reducer, lr_scheduler]
+
+  print('callback define done!')
 
 ###############################################################################
 
   print('model fit!')
+
   import time
   model_time = time.time()
   model.fit_generator(
       generator=generate_file(train_list, batch_size),
-      steps_per_epoch=630,
+      steps_per_epoch=1600,
       epochs=epochs,
       use_multiprocessing=True,
       verbose=1,
-      shuffle=True
+      shuffle=True,
+      callbacks=callbacks
   )
 
   # gc
@@ -116,14 +137,27 @@ def main(argv):
   
 ###############################################################################
 
-  print('model save!')
-  import time
-  if not isdir('./model'):
-    mkdir('./model')
-  model.save('./model/cnn_model_all_' + str(time.time()) + '.h5')
-  print('model save done!')
+def lr_schedule(epoch):
+    """Learning Rate Schedule
+    Learning rate is scheduled to be reduced after 80, 120, 160, 180 epochs.
+    Called automatically every epoch as part of callbacks during training.
+    # Arguments
+        epoch (int): The number of epochs
+    # Returns
+        lr (float32): learning rate
+    """
+    lr = 1e-3
+    if epoch > 180:
+        lr *= 0.5e-3
+    elif epoch > 160:
+        lr *= 1e-3
+    elif epoch > 120:
+        lr *= 1e-2
+    elif epoch > 80:
+        lr *= 1e-1
+    print('Learning rate: ', lr)
 
-###############################################################################
+    return lr
 
 def generate_file(file_list, batch_size):
   shuffle(file_list)
@@ -131,7 +165,7 @@ def generate_file(file_list, batch_size):
     for file in file_list:
       h5f = h5py.File(file, 'r')
       feature = h5f['feature'][:]
-      feature = feature.reshape(feature.shape[0], 51, 39, 1)
+      feature = feature.reshape(feature.shape[0], frame_size, use_mfcc, 1)
       label = h5f['label'][:]
       h5f.close()
       # gc plz..

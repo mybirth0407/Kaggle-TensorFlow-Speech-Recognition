@@ -33,16 +33,10 @@ from multiprocessing import Pool
 # Use HDF File Format.
 import h5py
 
-# labels
-# all_label = listdir('./feature/train/train')
-# all_label.sort()
-# all_label_dict = {}
-# for (i, label) in zip(range(len(all_label)), all_label):
-#   all_label_dict[label] = i
-#
-# int_dict = dict(zip(
-#     all_label_dict.values(), all_label_dict.keys()
-# ))
+batch_size = 256
+frame_size = 51
+use_mel = 40
+use_mfcc = 39
 
 # mearningful labels
 meaningful_label = ['down', 'go', 'left', 'no', 'off',
@@ -79,7 +73,7 @@ def get_feature_file_list(file_list):
 def get_feature_file(file):
   print(file + ' start!')
   h5f = h5py.File(file, 'r')
-  feature = h5f['feature'][:]
+  feature = h5f['feature'][:, :use_mfcc]
   h5f.close()
   print(file + ' done!')
 
@@ -121,7 +115,7 @@ if __name__ == '__main__':
     for j in range(will):
       feature = feature_list[j]
       # print(feature.shape)
-      feature = feature.reshape(1, 51, 39, 1)
+      feature = feature.reshape(1, frame_size, use_mfcc, 1)
       print(str(cnt) + '/' + str(will))
       # axis = 0, column appending
       predict = model.predict(feature, batch_size=256)

@@ -5,7 +5,6 @@ from keras.layers import AveragePooling2D, Input, Flatten
 from keras.optimizers import Adam
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
 from keras.callbacks import ReduceLROnPlateau
-from keras.preprocessing.image import ImageDataGenerator
 from keras.regularizers import l2
 from keras import backend as K
 from keras.models import Model
@@ -22,12 +21,13 @@ from multiprocessing import Pool
 from random import shuffle
 import h5py
 
+epochs = 6
+batch_size = 256
+frame_size = 51
+use_mel = 40
+use_mfcc = 39
+
 def main(argv):
-###############################################################################
-
-  epochs = 2
-  batch_size = 256
-
 ###############################################################################
 
   print('data loading!')
@@ -47,7 +47,7 @@ def main(argv):
   file_list = None
 
   x_val, y_val = get_feature_mode('val', val_list)
-  x_val = x_val.reshape(x_val.shape[0], 51, 39, 1)
+  x_val = x_val.reshape(x_val.shape[0], frame_size, use_mfcc, 1)
   print(x_val.shape)
   print(y_val.shape)
 
@@ -55,36 +55,21 @@ def main(argv):
 
 ###############################################################################
 
-  print('model constructing!')
+  print('model loading!')
   print(x_val.shape[1])
   print(y_val.shape[1])
-  input_shape = (51, 39, 1)
+  input_shape = (frame_size, use_mfcc, 1)
 
-  n = 3
-  if argv[2] == '1':
-    depth = n * 6 + 2
-    model = resnet_v1(input_shape=input_shape, depth=depth, num_classes=12)
-  elif argv[2] == '2':
-    depth = n * 9 + 2
-    model = resnet_v2(input_shape=input_shape, depth=depth, num_classes=12)
-  try:
-    model = load_model(argv[3])
+  model = load_model(argv[2])
   
-  except:
-    model.compile(loss='categorical_crossentropy',
-                optimizer=Adam(lr=lr_schedule(0)),
-                metrics=['accuracy'])
-    model.summary()
-    print('model constructing done!')
+  print('model loading done!')
 
 ###############################################################################
 
   print('callback define!')
-  import time
-  now = time.localtime()
-  time_stamp = '%02d%02d%02d' % (now.tm_mday, now.tm_hour, now.tm_min)
-  save_dir = os.path.join(os.getcwd(), 'saved_models_' + time_stamp)
-  model_name = 'resnet_v' + argv[2] + '_model.{epoch:03d}.h5'
+  time_stamp = os.path.dirname(argv[2])
+  save_dir = os.path.join(os.getcwd(), 'saved_models_' + timestamp[-6:])
+  model_name = 'resnet_model_all.{epoch:03d}.h5'
 
   if not isdir(save_dir):
     mkdir(save_dir)
@@ -92,7 +77,7 @@ def main(argv):
 
   # Prepare callbacks for model saving and for learning rate adjustment.
   checkpoint = ModelCheckpoint(filepath=filepath,
-                               monitor='val_acc',
+                               monitor='acc',
                                verbose=1,
                                save_best_only=True)
 
@@ -113,7 +98,7 @@ def main(argv):
   
   model.fit_generator(
       generator=generate_file(train_list, batch_size),
-      steps_per_epoch=630,
+      steps_per_epoch=1600,
       validation_data=(x_val, y_val),
       validation_steps=y_val.shape[0] // batch_size,
       epochs=epochs,
@@ -137,7 +122,7 @@ def generate_file(file_list, batch_size):
     for file in file_list:
       h5f = h5py.File(file, 'r')
       feature = h5f['feature'][:]
-      feature = feature.reshape(feature.shape[0], 51, 39, 1)
+      feature = feature.reshape(feature.shape[0], frame_size, use_mfcc, 1)
       label = h5f['label'][:]
       h5f.close()
       # gc plz..

@@ -13,6 +13,10 @@ import shutil
 from random import shuffle
 
 
+frame_size = 51
+use_mfcc = 39
+use_mel = 40
+
 # labels
 # 12 class
 meaningful_label = ['down', 'go', 'left', 'no', 'off',
@@ -58,7 +62,7 @@ def get_feature_mode(mode, file_list):
 
   x = feature_vector[:, :-1]
   y = feature_vector[:, -1]
-  y = np.array([y[i] for i in range(0, y.shape[0], 51)])
+  y = np.array([y[i] for i in range(0, y.shape[0], frame_size)])
   # print(x.shape)
   # print(y.shape)
   # stop()
@@ -68,7 +72,7 @@ def get_feature_mode(mode, file_list):
   y = np_utils.to_categorical(y, num_classes=n_meaningful_class)
   print(x.shape)
   print(y.shape)
-  x = np.reshape(x, (x.shape[0] // 51, 51, 39))
+  x = np.reshape(x, (x.shape[0] // frame_size, frame_size, use_mfcc + use_mel))
   print(mode + ' data loading done!')
 
   return x, y
@@ -79,7 +83,6 @@ def get_feature_file_list(file_list):
   result = pool.map(get_feature_file, file_list)
   shuffle(result)
   pool.close()
-  pool.join()
 
   return result
 

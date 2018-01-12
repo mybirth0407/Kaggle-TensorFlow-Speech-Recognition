@@ -31,10 +31,11 @@ train_audio_path = './train/audio/'
 def main(argv):
   n_processes = multiprocessing.cpu_count()
 
+  labels = listdir(train_audio_path)
   # using process pool(like thread pool)
   pool = Pool(processes=n_processes)
   pool.map(
-    aug_path, [(train_audio_path + label) for label in meaningful_label]
+    aug_path, [(train_audio_path + label) for label in labels]
   )
   pool.close()
 
@@ -53,25 +54,60 @@ def aug_path(arg):
 
 def do_aug(file_path):
   y, sr = load_audio(file_path)
+  
   if sr == 0:
     return
+    
+  dir_name = os.path.dirname(file_path)
+  label = os.path.basename(os.path.normpath(dir_name))
 
   amp_noise_shift(file_path, y, sr)
-
-  if os.path.basename(file_path) in meaningful_label:
-    amp_sound(file_path, y, sr)
-    add_white_noise(file_path, y, sr)
-    shift_sound_right(file_path, y, sr)
-    shift_sound_left(file_path, y, sr)
-    stretch_sound(file_path, y, sr, 1.2)
-    stretch_sound(file_path, y, sr, 1.1)
-    stretch_sound(file_path, y, sr, 0.8)
-    stretch_sound(file_path, y, sr, 0.9)
-    stretch_sound2(file_path, y, sr, 0.85)
-    stretch_sound2(file_path, y, sr, 1.15)
+  
+  if label in meaningful_label:
+    if label.find('_background_noise_') != -1:
+      silence(file_path, y, sr)
+    else:
+      amp_sound(file_path, y, sr)
+      add_white_noise(file_path, y, sr)
+      shift_sound_right(file_path, y, sr)
+      shift_sound_left(file_path, y, sr)
+      stretch_sound(file_path, y, sr, 1.2)
+      stretch_sound(file_path, y, sr, 1.1)
+      stretch_sound(file_path, y, sr, 0.8)
+      stretch_sound(file_path, y, sr, 0.9)
+      stretch_sound2(file_path, y, sr, 0.85)
+      stretch_sound2(file_path, y, sr, 1.15)
   y, sr = None, None
   return
+  
+def silence(file_path, y, sr):
+  num_sample = 100
+  divide_num = int(len(y) / sr) + 1
+  for i in range(0, divide_num - 1) :
+    new_y = np.zeros(sr, dtype=float)
+    new_y[:] = y[sr * i:sr * (i + 1)]
 
+    for j in range(1, num_sample):
+      ratio = 0.99 - 0.001 * j
+      new_y *= ratio
+      # save
+      cur_dir = os.path.dirname(file_path)
+      label = os.path.basename(os.path.normpath(cur_dir))
+      if not isdir('./augmentation/audio/' + label):
+        mkdir('./augmentation/audio/' + label)
+      path = cur_dir.replace('train', 'augmentation')
+      file = os.path.basename(os.path.normpath(file_path))
+      file, ext = os.path.splitext(file)
+      file += '_' + str(j) + '_' + str(i) + 'th' + ext
+      fname = os.path.join(path, file)
+
+      if isfile(fname):
+        return
+      else:
+        librosa.output.write_wav(
+            fname, y=new_y, sr=sr, norm=False
+        )
+        
 def add_white_noise(file_path, y, sr):
   # Adding white noise 
   new_y = y
@@ -91,15 +127,12 @@ def add_white_noise(file_path, y, sr):
   cur_dir = os.path.dirname(file_path)
   label = os.path.basename(os.path.normpath(cur_dir))
   if not isdir('./augmentation/audio/' + label):
-    if label == '_background_noise_':
-      label = 'silence'
     mkdir('./augmentation/audio/' + label)
   path = cur_dir.replace('train', 'augmentation')
   file = os.path.basename(os.path.normpath(file_path))
   file, ext = os.path.splitext(file)
   file += '_wn' + ext 
   fname = os.path.join(path, file)
-  fname = fname.replace('_background_noise_', label)
 
   if isfile(fname):
     return
@@ -123,7 +156,7 @@ def stretch_sound(file_path, y, sr, volume):
 
     if position_index < len(y) - 1:
       interpolation = position_num - int(position_num)
-      new_y[i] = interpolation * y[position_index + 1]
+      new_y[i] = interpolation * y[position_index + 1]\
           + (1 - interpolation) * y[position_index]
     else:
       new_y[i] = 0.005 * white_noise
@@ -138,7 +171,7 @@ def stretch_sound(file_path, y, sr, volume):
   file, ext = os.path.splitext(file)
   file += '_stretch_'+ str(volume) + ext
   fname = os.path.join(path, file)
-  fname = fname.replace('_background_noise_', label)
+
   if isfile(fname):
     return
   else:
@@ -164,7 +197,7 @@ def stretch_sound2(file_path, y, sr, volume):
 
   file += '_stretch_'+ str(volume) + ext
   fname = os.path.join(path, file)
-  fname = fname.replace('_background_noise_', label)
+
   if isfile(fname):
     return
   else:
@@ -174,7 +207,8 @@ def stretch_sound2(file_path, y, sr, volume):
 
 
 def amp_noise_shift(file_path, y, sr):
-  # shift the sound by (500+start) and amp it by 1.5 and mix the noise (0.005*white_noise)
+  # shift the sound by (500 + start) and amp it by 1.5
+  # and mix the noise (0.005 * white_noise)
   start, end = split_silence(y)
   new_y = y
   for i in range(0, len(y) - 1):
@@ -196,7 +230,6 @@ def amp_noise_shift(file_path, y, sr):
   file, ext = os.path.splitext(file)
   file += '_amp_noise_shift_' + ext
   fname = os.path.join(path, file)
-  fname = fname.replace('_background_noise_', label)
 
   if isfile(fname):
     return
@@ -221,13 +254,12 @@ def amp_sound(file_path, y, sr):
   file, ext = os.path.splitext(file)
   file += '_amp' + ext
   fname = os.path.join(path, file)
-  fname = fname.replace('_background_noise_', label)
 
   if isfile(fname):
     return
   else:
     librosa.output.write_wav(
-      fname, y=new_y, sr=sr, norm=False
+        fname, y=new_y, sr=sr, norm=False
     )
 
 
@@ -260,7 +292,7 @@ def shift_sound_right(file_path, y, sr):
   file, ext = os.path.splitext(file)
   file += 'sft_r' + ext
   fname = os.path.join(path, file)
-  fname = fname.replace('_background_noise_', label)
+  
   if isfile(fname):
     return
   else:
@@ -280,7 +312,7 @@ def shift_sound_left(file_path, y, sr):
   file, ext = os.path.splitext(file)
   file += 'sft_l' + ext
   fname = os.path.join(path, file)
-  fname = fname.replace('_background_noise_', label)
+  
   if isfile(fname):
     return
   else:
