@@ -19,6 +19,7 @@ import numpy as np
 from keras import layers, models
 from keras.optimizers import Adam
 from keras import backend as K
+from keras.models import load_model
 from keras.utils import to_categorical
 from capsulelayers import CapsuleLayer, PrimaryCap, Length, Mask
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
@@ -35,7 +36,7 @@ from multiprocessing import Pool
 from random import shuffle
 import h5py
 
-epochs = 6
+epochs = 2
 batch_size = 256
 frame_size = 51
 use_mel = 40
@@ -61,13 +62,10 @@ def main(argv):
   val_list = []
   test_list = []
   train_list = []
+  
+  val_list.append(os.path.join(argv[1], file_list[0]))
   for file in file_list:
-    if file.find('val') != -1:
-      val_list.append(os.path.join(argv[1], file))
-    elif file.find('test') != -1:
-      test_list.append(os.path.join(argv[1], file))
-    else:
-      train_list.append(os.path.join(argv[1], file))
+    train_list.append(os.path.join(argv[1], file))
 
   # gc plz..
   file_list = None
@@ -76,7 +74,7 @@ def main(argv):
   if use == 'mel':
     x_val = x_val.reshape(x_val.shape[0], frame_size, use_mel, 1)
   elif use == 'mfcc':
-    x_val = x_val.reshape(x_val.shape[0], frame_size, use_mfcc, 1)
+    x_val = x_val.reshape(x_val.shape[0], frame_size, use_mfcc, 1)`
   print(x_val.shape)
   print(y_val.shape)
 
@@ -84,16 +82,17 @@ def main(argv):
 
 ###############################################################################
 
-  print('model constructing!')
+  print('model weight loading!')
+  
   print(x_val.shape[1])
   print(y_val.shape[1])
   input_shape = (frame_size, use_mfcc, 1)
-
 
   # define model
   model = CapsNet(input_shape=input_shape, n_class=n_classes, routings=routings)
   model.summary()
 
+  model.load_weights(argv[2])
   # compile the model
   model.compile(
       optimizer=Adam(lr=lr),
@@ -102,16 +101,16 @@ def main(argv):
       metrics={'capsnet': 'accuracy'}
   )
 
-  print('model constructing done!')
+  print('model weight loading done!')
 
 ###############################################################################
 
   print('callback define!')
-  import time
-  now = time.localtime()
-  time_stamp = '%02d%02d%02d' % (now.tm_mday, now.tm_hour, now.tm_min)
-  save_dir = os.path.join(os.getcwd(), 'saved_models_' + time_stamp + use)
-  model_name = 'capsnet_model.{epoch:03d}.h5'
+  time_stamp = os.path.dirname(argv[2])
+  file_name = os.path.basename(os.path.normpath(argv[2]))
+  file_name, _ = os.path.splitext(file_name)
+  save_dir = os.path.join(os.getcwd(), 'saved_models_' + time_stamp[-6:] + use)
+  model_name = file_name + '.{epoch:03d}.h5'
 
   if not isdir(save_dir):
     mkdir(save_dir)
@@ -119,9 +118,8 @@ def main(argv):
 
   # Prepare callbacks for model saving and for learning rate adjustment.
   checkpoint = ModelCheckpoint(filepath=filepath,
-                               monitor='val_capsnet_acc',
+                               monitor='acc',
                                verbose=1,
-                               save_weights_only=True,
                                save_best_only=True)
 
   # callbacks
@@ -140,9 +138,7 @@ def main(argv):
   
   model.fit_generator(
       generator=generate_file(train_list, batch_size),
-      steps_per_epoch=1534,
-      validation_data=([x_val, y_val], [y_val, x_val]),
-      validation_steps=y_val.shape[0] // batch_size,
+      steps_per_epoch=1587,
       epochs=epochs,
       use_multiprocessing=True,
       verbose=1,
@@ -156,21 +152,7 @@ def main(argv):
 
   print('model fit done!')
   
-###############################################################################
     
-  print('model evaluate!')
-  x_test, y_test = get_feature_mode('test', test_list)
-  if use == 'mel':
-    x_test = x_test.reshape(x_test.shape[0], frame_size, use_mel, 1)
-  elif use =='mfcc':
-    x_test = x_test.reshape(x_test.shape[0], frame_size, use_mfcc, 1)
-  # predict = model.predict(x_test, batch_size=batch_size)
-    score = model.evaluate(
-        ([x_test, y_test], [y_test, x_test]),
-        batch_size=batch_size
-    )
-  print('model evaluate done!')
-
 def generate_file(file_list, batch_size):
   shuffle(file_list)
   while True:
@@ -228,7 +210,7 @@ def get_feature_file(file):
     feature = h5f['feature'][:,:,use_mel - 1:]
   elif use =='mfcc':
     feature = h5f['feature'][:,:,:use_mfcc]
-    
+
   label = h5f['label'][:] 
   h5f.close()
   print(file + ' done!')

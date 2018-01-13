@@ -60,6 +60,7 @@ int_dict = dict(zip(
     meaningful_label_dict.values(), meaningful_label_dict.keys()
 ))
 
+use = sys.argv[2]
 
 def get_feature_file_list(file_list):
   n_processes = multiprocessing.cpu_count()
@@ -73,8 +74,10 @@ def get_feature_file_list(file_list):
 def get_feature_file(file):
   print(file + ' start!')
   h5f = h5py.File(file, 'r')
-  feature = h5f['feature'][:, :use_mfcc]
-  h5f.close()
+  if use == 'mel':
+    feature = h5f['feature'][:,use_mel - 1:]
+  elif use == 'mfcc':
+    feature = h5f['feature'][:,:use_mfcc]  h5f.close()
   print(file + ' done!')
 
   return feature
@@ -95,12 +98,7 @@ if __name__ == '__main__':
   n = 100
   file_list = [file_list[i::n] for i in range(n)]
 
-  if not isdir('./pred'):
-    mkdir('./pred')
-
-  import time
-  # f = open('./pred/pred_' + str(time.time()) +  '.csv', 'w')
-  base_name = os.path.basename(sys.argv[1])
+  base_name = os.path.dirname(sys.argv[1])
   pred_file = os.path.basename(os.path.normpath(sys.argv[1]))
   pred_file, _ = os.path.splitext(pred_file)
   pred_file = os.path.join(base_name, pred_file)
@@ -117,7 +115,10 @@ if __name__ == '__main__':
     for j in range(will):
       feature = feature_list[j]
       # print(feature.shape)
-      feature = feature.reshape(1, 51, 39, 1)
+      if use == 'mel':
+        feature = feature.reshape(1, frame_size, use_mel, 1)
+      elif use == 'mfcc':
+        feature = feature.reshape(1, frame_size, use_mfcc, 1)
       print(str(cnt) + '/' + str(will))
       # axis = 0, column appending
       predict = model.predict(feature, batch_size=256)

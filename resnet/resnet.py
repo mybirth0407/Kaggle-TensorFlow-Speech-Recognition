@@ -22,11 +22,13 @@ from multiprocessing import Pool
 from random import shuffle
 import h5py
 
-epochs = 20
+epochs = 12
 batch_size = 256
 frame_size = 51
 use_mel = 40
 use_mfcc = 39
+
+use = sys.argv[3]
 
 def main(argv):
 ###############################################################################
@@ -50,7 +52,10 @@ def main(argv):
   file_list = None
 
   x_val, y_val = get_feature_mode('val', val_list)
-  x_val = x_val.reshape(x_val.shape[0], frame_size, use_mfcc, 1)
+  if use == 'mel':
+    x_val = x_val.reshape(x_val.shape[0], frame_size, use_mel, 1)
+  elif use == 'mfcc':
+    x_val = x_val.reshape(x_val.shape[0], frame_size, use_mfcc, 1)
   print(x_val.shape)
   print(y_val.shape)
 
@@ -83,7 +88,7 @@ def main(argv):
   import time
   now = time.localtime()
   time_stamp = '%02d%02d%02d' % (now.tm_mday, now.tm_hour, now.tm_min)
-  save_dir = os.path.join(os.getcwd(), 'saved_models_' + time_stamp)
+  save_dir = os.path.join(os.getcwd(), 'saved_models_' + time_stamp + use)
   model_name = 'resnet_v' + argv[2] + '_model.{epoch:03d}.h5'
 
   if not isdir(save_dir):
@@ -133,7 +138,10 @@ def main(argv):
     
   print('model evaluate!')
   x_test, y_test = get_feature_mode('test', test_list)
-  x_test = x_test.reshape(x_test.shape[0], frame_size, use_mfcc, 1)
+  if use == 'mel':
+    x_test = x_test.reshape(x_test.shape[0], frame_size, use_mel, 1)
+  elif use =='mfcc':
+    x_test = x_test.reshape(x_test.shape[0], frame_size, use_mfcc, 1)
   # predict = model.predict(x_test, batch_size=batch_size)
   score = model.evaluate(x_test, y_test, batch_size=batch_size)
   print('model evaluate done!')
@@ -148,8 +156,13 @@ def generate_file(file_list, batch_size):
   while True:
     for file in file_list:
       h5f = h5py.File(file, 'r')
-      feature = h5f['feature'][:]
-      feature = feature.reshape(feature.shape[0], frame_size, use_mfcc, 1)
+      if use == 'mel':
+        feature = h5f['feature'][:,:,use_mel - 1:]
+        feature = feature.reshape(feature.shape[0], frame_size, use_mel, 1)
+      elif use == 'mfcc':
+        feature = h5f['feature'][:,:,:use_mfcc]
+        feature = feature.reshape(feature.shape[0], frame_size, use_mfcc, 1)
+
       label = h5f['label'][:]
       h5f.close()
       # gc plz..
@@ -170,19 +183,6 @@ def get_feature_mode(mode, file_list):
   print(len(feature_vector_list))
   print(feature_vector_list[0][0].shape)
   print(feature_vector_list[0][1].shape)
-  # print(feature_vector_list[0][0][0].shape)
-  # print(feature_vector_list[0][1][0])
-
-  # feature_vector = np.empty((0, feature_vector_list[0][0][0].shape[0]))
-  # cnt = 1
-  # will = len(feature_vector_list)
-  # for feature in feature_vector_list[0][0]:
-  #   print(feature.shape)
-  #   stop()
-  #   print(str(cnt) + '/' + str(will))
-  #   # axis = 0, column appending
-  #   feature_vector = np.append(feature_vector[0], feature, axis=0)
-  #   cnt += 1
 
   print(mode + ' data loading done!')
 
@@ -201,7 +201,11 @@ def get_feature_file_list(file_list):
 def get_feature_file(file):
   print(file + ' start!')
   h5f = h5py.File(file, 'r')
-  feature = h5f['feature'][:]
+  if use == 'mel':
+    feature = h5f['feature'][:,:,use_mel - 1:]
+  elif use =='mfcc':
+    feature = h5f['feature'][:,:,:use_mfcc]
+
   label = h5f['label'][:] 
   h5f.close()
   print(file + ' done!')
