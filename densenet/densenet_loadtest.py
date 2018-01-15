@@ -12,15 +12,19 @@ from os.path import isdir
 # Using Data Processing for Multiprocessing.
 import multiprocessing
 from multiprocessing import Pool
+# Use List Random Shuffle. 
+from random import shuffle
 # Use HDF File Format.
 import h5py
 
-import time
-
-import tensorflow as tf
 
 from tensorflow.contrib.layers import batch_norm, flatten
 from tensorflow.contrib.framework import arg_scope
+
+
+import tensorflow as tf
+import datetime
+import time
 
 # Hyperparameter
 growth_k = 12
@@ -35,42 +39,9 @@ weight_decay = 1e-4
 
 # Label & batch_size
 class_num = 12
+#batch_size = 100
 
-
-
-# labels
-# all_label = listdir('./feature/train/train')
-# all_label.sort()
-# all_label_dict = {}
-# for (i, label) in zip(range(len(all_label)), all_label):
-#   all_label_dict[label] = i
-#
-# int_dict = dict(zip(
-#     all_label_dict.values(), all_label_dict.keys()
-# ))
-
-# mearningful labels
-meaningful_label = ['down', 'go', 'left', 'no', 'off',
-                    'on', 'right', 'silence', 'stop', 'up', 'yes']
-meaningful_label.sort()
-# except label
-except_label = ['unknown']
-
-meaningful_label_dict = {}
-
-n_except = 0
-for (i, label) in zip(range(len(except_label)), except_label):
-    meaningful_label_dict[label] = i
-    n_except += 1
-
-for (i, label) in zip(range(n_except, len(meaningful_label)), meaningful_label):
-    meaningful_label_dict[label] = i
-
-
-int_dict = dict(zip(
-    meaningful_label_dict.values(), meaningful_label_dict.keys()
-))
-
+total_epochs = 5 #12
 
 # Densenet Network Design
 
@@ -195,7 +166,6 @@ class DenseNet():
                         stride=1, layer_name='conv1')
         x = Max_Pooling(x, pool_size=[2,2], stride=2)
 
-
         for i in range(self.nb_blocks) :
             # 6 -> 12 -> 48
             x = self.dense_block(input_x=x, nb_layers=4, layer_name='dense_'+str(i))
@@ -225,50 +195,42 @@ class DenseNet():
 
 
 
-
-def get_feature_file_list(file_list):
-    n_processes = multiprocessing.cpu_count()
-    pool = Pool(processes=n_processes)
-    result = pool.map(get_feature_file, file_list)
-    pool.close()
-    pool.join()
-
-    return result
-
-def get_feature_file(file):
-#    print(file + ' start!')
-    h5f = h5py.File(file, 'r')
-    feature = h5f['feature'][:, :39]
-    h5f.close()
-#    print(file + ' done!')
-
-    return feature
-
-def most_common(l):
-    return max(set(l), key=l.count)
-
-
-
 def main(argv):
-    feature_path = '../feature/test/'
+###############################################################################
 
-    file_list = []
+    epochs = 12
+    batch_size = 128
 
-    for file in listdir(feature_path):
-        file_list.append(os.path.join(feature_path, file))
-    file_list.sort()
+###############################################################################
 
-    n = 100
-    file_list = [file_list[i::n] for i in range(n)]
+    print('data loading!')
+    file_list = listdir(argv[1])
+    shuffle(file_list)
 
-    if not isdir('./pred'):
-        mkdir('./pred')
+    val_list = []
+    test_list = []
+    train_list = []
+    for file in file_list:
+        if file.find('val') != -1:
+            val_list.append(os.path.join(argv[1], file))
+        elif file.find('test') != -1:
+            test_list.append(os.path.join(argv[1], file))
+        else:
+            train_list.append(os.path.join(argv[1], file))
 
-    # f = open('./pred/pred_' + str(time.time()) +  '.csv', 'w')
-    pred_file, _ = os.path.splitext(sys.argv[1])
-    pred_file = os.path.join('./pred/densenet_v3_k_0115')# pred_file)
-    f = open(pred_file + '.csv', 'w')
-    f.write('fname,label\n')
+    # gc plz..
+    file_list = None
+
+#    x_val, y_val = get_feature_mode('val', val_list)
+#    x_val = x_val.reshape(x_val.shape[0], 51, 39, 1)
+    x_test, y_test = get_feature_mode('test', test_list)
+    x_test = x_test.reshape(x_test.shape[0], 51, 39, 1)
+#    print("x_val.shape: ", x_val.shape)
+#    print("y_val.shape: ", y_val.shape)
+
+    print('data loading done!')
+
+###############################################################################
 
     X = tf.placeholder(tf.float32, shape=[None, 51, 39, 1])
     label = tf.placeholder(tf.float32, shape=[None, 12])
@@ -299,56 +261,166 @@ def main(argv):
 
     saver = tf.train.Saver(tf.global_variables())
 
+###############################################################################
+
     with tf.Session() as sess:
-        ckpt = tf.train.get_checkpoint_state(sys.argv[1])
-        saver.restore(sess, ckpt.model_checkpoint_path)
+        if not isdir('./loadval_v3'):
+            mkdir('./loadval_v3')
 
-        for i in range(len(file_list)):
-            feature_list = get_feature_file_list(file_list[i])
-            cnt = 1
-            will = len(feature_list)
-            labels = []
+        ckpt = tf.train.get_checkpoint_state('./loadval_v3')
+        if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+            print("LOADING\n\n")
+            saver.restore(sess, ckpt.model_checkpoint_path)
+        else:
+            sess.run(tf.global_variables_initializer())
 
-            #########
-            for j in range(will):
-                feature = feature_list[j]
-                # print(feature.shape)
-                feature = feature.reshape(1, 51, 39, 1)
-                test_feed_dict = {
-                    X: feature,
-                    training_flag : False
+        merged = tf.summary.merge_all()
+        writer = tf.summary.FileWriter('./logs', sess.graph)
+
+        best = 0.
+        global_step = 0
+        epoch_learning_rate = init_learning_rate
+        for epoch in range(total_epochs):
+            total_steps = 20
+            train_generator = generate_file(test_list, 128)
+            for step in range(total_steps):
+                batch_x, batch_y = next(train_generator)
+
+                train_feed_dict = {
+                    X: batch_x,
+                    label: batch_y,
+                    learning_rate: epoch_learning_rate,
+                    training_flag : True
                 }
 
-                predict = sess.run(prediction, feed_dict=test_feed_dict)
+                _, loss = sess.run([train, cost], feed_dict=train_feed_dict)
 
-                print(str(cnt) + '/' + str(will))
-                # axis = 0, column appending
-#                predict = model.predict(feature, batch_size=256)
-#                print(predict)
-                label_index = list(np.argmax(predict, axis=1))
-#                print(label_index)
-                y = max(set(label_index), key=label_index.count)
-#                print(y)
-                y = int_dict.get(y)
-#                print(y)
-                if y in meaningful_label:
-                    pass
-                else:
-                    y = except_label[0]
-                cnt += 1
-                labels.append(y)
-    
-            for j in range(will):
-                file = file_list[i][j]
-                fname = os.path.basename(os.path.normpath(file))
-                fname, _ = os.path.splitext(fname)
-                fname = fname + '.wav'
+                if step % 1 == 0:
+                    val_feed_dict = {
+                        X: x_test, #x_val,
+                        label: y_test, #y_val,
+                        learning_rate: epoch_learning_rate,
+                        training_flag : False
+                    }
 
-                f.write(fname + ',' + str(labels[j]) + '\n')
+                    global_step += 10
+                    train_summary, train_accuracy = sess.run([merged, accuracy], 
+                                                        feed_dict=train_feed_dict)
+                    val_loss, val_accuracy = sess.run([cost, accuracy], 
+                                                        feed_dict=val_feed_dict)
+                    # accuracy.eval(feed_dict=feed_dict)
+                    print("Step: %.3d" % step, 
+                        "Training Loss: %.5f" % loss, 
+                        "Training accuracy: %.5f" % train_accuracy,
+                        "Val Loss: %.5f" % val_loss,
+                        "Val accuracy: %.5f" % val_accuracy)
+                    writer.add_summary(train_summary, global_step=epoch)
 
-    f.close()
+#                    if val_accuracy > 0.94 and val_accuracy > best:
+#                        print('model save!')
+#                        best = val_accuracy
+#                        timestr = str(datetime.datetime.now())
+#                        saver.save(sess=sess, save_path='./loadval_v3/densenet_model_' 
+#                                + timestr[:10] + 'T' + timestr[11:19] + '_' + str(best) +'.ckpt')
+
+        print('model fit done!')
+  
+###############################################################################
+
+        print('model save!')
+        timestr = str(datetime.datetime.now())
+        saver.save(sess=sess, save_path='./loadtest_v3/densenet_model_' 
+                                + timestr[:10] + 'T' + timestr[11:19] + '.ckpt')
+        print('model save done!')
+
+###############################################################################
+
+        print('model evaluate!')
+        x_test, y_test = get_feature_mode('test', test_list)
+        x_test = x_test.reshape(x_test.shape[0], 51, 39, 1)
+        test_feed_dict = {
+            X: x_test,
+            label: y_test,
+            learning_rate: epoch_learning_rate,
+            training_flag : False
+        }
+        # predict = model.predict(x_test, batch_size=batch_size)
+        score = sess.run(accuracy, feed_dict=test_feed_dict)
+        print('model evaluate done!')
+
+###############################################################################
+
+        print("Testing acc: ", score)
 
 
+def generate_file(file_list, batch_size):
+    shuffle(file_list)
+    while True:
+        for file in file_list:
+            h5f = h5py.File(file, 'r')
+            feature = h5f['feature'][:, :, :39]
+            feature = feature.reshape(feature.shape[0], 51, 39, 1)
+            label = h5f['label'][:]
+            h5f.close()
+            # gc plz..
+            i = 0
+            for i in range(label.shape[0] // batch_size):
+                yield(
+                    feature[i*batch_size:(i+1)*batch_size],
+                    label[i*batch_size:(i+1)*batch_size]
+                )
+
+                # yield(x, y)
+                i += 1
+
+def get_feature_mode(mode, file_list):
+    print(mode + ' data loading!')
+
+    feature_vector_list = get_feature_file_list(file_list)
+    print(len(feature_vector_list))
+    print(feature_vector_list[0][0].shape)
+    print(feature_vector_list[0][1].shape)
+    # print(feature_vector_list[0][0][0].shape)
+    # print(feature_vector_list[0][1][0])
+
+    # feature_vector = np.empty((0, feature_vector_list[0][0][0].shape[0]))
+    # cnt = 1
+    # will = len(feature_vector_list)
+    # for feature in feature_vector_list[0][0]:
+    #   print(feature.shape)
+    #   stop()
+    #   print(str(cnt) + '/' + str(will))
+    #   # axis = 0, column appending
+    #   feature_vector = np.append(feature_vector[0], feature, axis=0)
+    #   cnt += 1
+
+    print(mode + ' data loading done!')
+
+    # return features, labels
+    return feature_vector_list[0][0], feature_vector_list[0][1]
+
+def get_feature_file_list(file_list):
+    n_processes = multiprocessing.cpu_count()
+    pool = Pool(processes=n_processes)
+    result =  pool.map(get_feature_file, file_list)
+    pool.close()
+    pool.join()
+
+    return result
+
+def get_feature_file(file):
+    print(file + ' start!')
+    h5f = h5py.File(file, 'r')
+    feature = h5f['feature'][:, :, :39]
+    label = h5f['label'][:] 
+    h5f.close()
+    print(file + ' done!')
+
+    return (feature, label)
+
+def stop():
+    while True: pass
 
 if __name__ == '__main__':
     main(sys.argv)
+
