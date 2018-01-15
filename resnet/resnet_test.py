@@ -72,13 +72,13 @@ def get_feature_file_list(file_list):
   return result
 
 def get_feature_file(file):
-  print(file + ' start!')
+  # print(file + ' start!')
   h5f = h5py.File(file, 'r')
   if use == 'mel':
     feature = h5f['feature'][:,use_mel - 1:]
   elif use == 'mfcc':
     feature = h5f['feature'][:,:use_mfcc]  h5f.close()
-  print(file + ' done!')
+  # print(file + ' done!')
 
   return feature
 
@@ -106,6 +106,7 @@ if __name__ == '__main__':
   f.write('fname,label\n')
 
   for i in range(len(file_list)):
+    print(str(i) + '/' + str(len(file_list)))
     feature_list = get_feature_file_list(file_list[i])
     cnt = 1
     will = len(feature_list)
@@ -119,7 +120,7 @@ if __name__ == '__main__':
         feature = feature.reshape(1, frame_size, use_mel, 1)
       elif use == 'mfcc':
         feature = feature.reshape(1, frame_size, use_mfcc, 1)
-      print(str(cnt) + '/' + str(will))
+      # print(str(cnt) + '/' + str(will))
       # axis = 0, column appending
       predict = model.predict(feature, batch_size=256)
       label_index = list(np.argmax(predict, axis=1))

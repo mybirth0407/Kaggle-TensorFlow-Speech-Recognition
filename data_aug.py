@@ -32,6 +32,17 @@ def main(argv):
   n_processes = multiprocessing.cpu_count()
 
   labels = listdir(train_audio_path)
+  labels.sort(key=str.lower)
+  # sort here, if you don't make the silence set first with background noise
+  # there can be a error
+
+  s_files = listdir(train_audio_path + '_background_noise_')
+  pool = Pool(processes=n_processes)
+  pool.map(
+    aug_file, [(train_audio_path + '_background_noise_/' + file) for file in s_files]
+  )
+  pool.close()
+
   # using process pool(like thread pool)
   pool = Pool(processes=n_processes)
   pool.map(
@@ -52,6 +63,14 @@ def aug_path(arg):
   print(label + ' is done!')
   return
 
+def aug_file(arg):
+  y, sr = load_audio(arg)
+  
+  if sr == 0:
+    return
+    
+  silence(arg, y, sr)
+
 def do_aug(file_path):
   y, sr = load_audio(file_path)
   
@@ -61,22 +80,52 @@ def do_aug(file_path):
   dir_name = os.path.dirname(file_path)
   label = os.path.basename(os.path.normpath(dir_name))
 
-  amp_noise_shift(file_path, y, sr)
-  
   if label in meaningful_label:
     if label.find('_background_noise_') != -1:
       silence(file_path, y, sr)
+
     else:
       amp_sound(file_path, y, sr)
-      add_white_noise(file_path, y, sr)
-      shift_sound_right(file_path, y, sr)
-      shift_sound_left(file_path, y, sr)
       stretch_sound(file_path, y, sr, 1.2)
-      stretch_sound(file_path, y, sr, 1.1)
       stretch_sound(file_path, y, sr, 0.8)
-      stretch_sound(file_path, y, sr, 0.9)
       stretch_sound2(file_path, y, sr, 0.85)
       stretch_sound2(file_path, y, sr, 1.15)
+      pitch_up(file_path, y, sr)
+      pitch_down(file_path, y, sr)
+      shift_sound_right(file_path, y, sr)
+      shift_sound_left(file_path, y, sr)
+
+  else:
+    aug_type_1 = 0 
+    aug_type_2 = 0
+
+    while(aug_type_1 == aug_type_2):
+      aug_type_1 = random.randrange(1,10)
+      aug_type_2 = random.randrange(1,10)
+
+    if aug_type_1 == 1 or aug_type_2 == 1:
+      amp_sound(file_path, y, sr)
+    if aug_type_1 == 2 or aug_type_2 == 2:
+      stretch_sound(file_path, y, sr, 1.2)
+    if aug_type_1 == 3 or aug_type_2 == 3:
+      stretch_sound(file_path, y, sr, 0.8)
+    if aug_type_1 == 4 or aug_type_2 == 4:
+      stretch_sound2(file_path, y, sr, 0.85)
+    if aug_type_1 == 5 or aug_type_2 == 5:
+      stretch_sound2(file_path, y, sr, 1.15)
+    if aug_type_1 == 6 or aug_type_2 == 6:
+      pitch_up(file_path, y, sr)
+    if aug_type_1 == 7 or aug_type_2 == 7:
+      pitch_down(file_path, y, sr)
+    if aug_type_1 == 8 or aug_type_2 == 8:
+      shift_sound_right(file_path, y, sr)
+    if aug_type_1 == 9 or aug_type_2 == 9:
+      shift_sound_left(file_path, y, sr)
+      
+
+
+
+
   y, sr = None, None
   return
   
@@ -131,7 +180,11 @@ def add_white_noise(file_path, y, sr):
   path = cur_dir.replace('train', 'augmentation')
   file = os.path.basename(os.path.normpath(file_path))
   file, ext = os.path.splitext(file)
-  file += '_wn' + ext 
+
+  file += '_wn'
+
+  file += ext
+
   fname = os.path.join(path, file)
 
   if isfile(fname):
@@ -142,12 +195,12 @@ def add_white_noise(file_path, y, sr):
     )
 
 
-def stretch_sound(file_path, y, sr, volume):
-  # stretch the sound (by volume)
+def stretch_sound(file_path, y, sr, ratio):
+  # stretch the sound (by ratio)
   start, end = split_silence(y)
   white_noise = np.random.randn()
 
-  new_y_len = int(len(y) * volume)
+  new_y_len = int(len(y) * ratio)
   new_y = np.array(y, dtype=np.float)
 
   for i in range(1, len(y)):
@@ -169,7 +222,33 @@ def stretch_sound(file_path, y, sr, volume):
   path = cur_dir.replace('train', 'augmentation')
   file = os.path.basename(os.path.normpath(file_path))
   file, ext = os.path.splitext(file)
-  file += '_stretch_'+ str(volume) + ext
+
+  file += '_stretch_'+ str(ratio)
+
+  noise_num_1 = 0
+  noise_num_2 = 0
+  noise_num_3 = 0
+
+  while(noise_num_1 == noise_num_2 or noise_num_2 == noise_num_3):
+    noise_num_1 = random.randrange(1,7)
+    noise_num_2 = random.randrange(1,7)
+    noise_num_3 = random.randrange(1,7)
+
+  if noise_num_1 == 1 or noise_num_2 == 1 or noise_num_3 == 1:
+    noise1(path, file, new_y, sr)
+  if noise_num_1 == 2 or noise_num_2 == 2 or noise_num_3 == 2:
+    noise2(path, file, new_y, sr)
+  if noise_num_1 == 3 or noise_num_2 == 3 or noise_num_3 == 3:
+    noise3(path, file, new_y, sr)
+  if noise_num_1 == 4 or noise_num_2 == 4 or noise_num_3 == 4:
+    noise4(path, file, new_y, sr)
+  if noise_num_1 == 5 or noise_num_2 == 5 or noise_num_3 == 5:
+    noise5(path, file, new_y, sr)
+  if noise_num_1 == 6 or noise_num_2 == 6 or noise_num_3 == 6:
+    noise6(path, file, new_y, sr)
+
+  file += ext
+
   fname = os.path.join(path, file)
 
   if isfile(fname):
@@ -180,11 +259,11 @@ def stretch_sound(file_path, y, sr, volume):
     )
 
 
-def stretch_sound2(file_path, y, sr, volume):
+def stretch_sound2(file_path, y, sr, ratio):
   # stretch sound and make some effect at sound
   start, end = split_silence(y)
   white_noise = np.random.randn()
-  new_y = librosa.effects.time_stretch(y, volume)
+  new_y = librosa.effects.time_stretch(y, ratio)
 
   # save
   cur_dir = os.path.dirname(file_path)
@@ -195,7 +274,31 @@ def stretch_sound2(file_path, y, sr, volume):
   file = os.path.basename(os.path.normpath(file_path))
   file, ext = os.path.splitext(file)
 
-  file += '_stretch_'+ str(volume) + ext
+  file += '_stretch_'+ str(ratio)
+
+  noise_num_1 = 0
+  noise_num_2 = 0
+  noise_num_3 = 0
+
+  while(noise_num_1 == noise_num_2 or noise_num_2 == noise_num_3):
+    noise_num_1 = random.randrange(1,7)
+    noise_num_2 = random.randrange(1,7)
+    noise_num_3 = random.randrange(1,7)
+
+  if noise_num_1 == 1 or noise_num_2 == 1 or noise_num_3 == 1:
+    noise1(path, file, new_y, sr)
+  if noise_num_1 == 2 or noise_num_2 == 2 or noise_num_3 == 2:
+    noise2(path, file, new_y, sr)
+  if noise_num_1 == 3 or noise_num_2 == 3 or noise_num_3 == 3:
+    noise3(path, file, new_y, sr)
+  if noise_num_1 == 4 or noise_num_2 == 4 or noise_num_3 == 4:
+    noise4(path, file, new_y, sr)
+  if noise_num_1 == 5 or noise_num_2 == 5 or noise_num_3 == 5:
+    noise5(path, file, new_y, sr)
+  if noise_num_1 == 6 or noise_num_2 == 6 or noise_num_3 == 6:
+    noise6(path, file, new_y, sr)
+
+  file += ext
   fname = os.path.join(path, file)
 
   if isfile(fname):
@@ -211,10 +314,13 @@ def amp_noise_shift(file_path, y, sr):
   # and mix the noise (0.005 * white_noise)
   start, end = split_silence(y)
   new_y = y
-  for i in range(0, len(y) - 1):
+
+  y_len = len(y)
+
+  for i in range(0, y_len - 1):
     test = i + start + 500
-    if test > len(y) - 1:
-      j = test - len(y)
+    if test > y_len - 1:
+      j = test - y_len
     else:
       j = i + start + 500
     new_y[i] = 1.5 * y[j]
@@ -228,7 +334,32 @@ def amp_noise_shift(file_path, y, sr):
   path = cur_dir.replace('train', 'augmentation')
   file = os.path.basename(os.path.normpath(file_path))
   file, ext = os.path.splitext(file)
-  file += '_amp_noise_shift_' + ext
+
+  file += '_amp_noise_shift'
+
+  noise_num_1 = 0
+  noise_num_2 = 0
+  noise_num_3 = 0
+
+  while(noise_num_1 == noise_num_2 or noise_num_2 == noise_num_3):
+    noise_num_1 = random.randrange(1,7)
+    noise_num_2 = random.randrange(1,7)
+    noise_num_3 = random.randrange(1,7)
+
+  if noise_num_1 == 1 or noise_num_2 == 1 or noise_num_3 == 1:
+    noise1(path, file, new_y, sr)
+  if noise_num_1 == 2 or noise_num_2 == 2 or noise_num_3 == 2:
+    noise2(path, file, new_y, sr)
+  if noise_num_1 == 3 or noise_num_2 == 3 or noise_num_3 == 3:
+    noise3(path, file, new_y, sr)
+  if noise_num_1 == 4 or noise_num_2 == 4 or noise_num_3 == 4:
+    noise4(path, file, new_y, sr)
+  if noise_num_1 == 5 or noise_num_2 == 5 or noise_num_3 == 5:
+    noise5(path, file, new_y, sr)
+  if noise_num_1 == 6 or noise_num_2 == 6 or noise_num_3 == 6:
+    noise6(path, file, new_y, sr)
+
+  file += ext
   fname = os.path.join(path, file)
 
   if isfile(fname):
@@ -237,7 +368,6 @@ def amp_noise_shift(file_path, y, sr):
     librosa.output.write_wav(
         fname, y=new_y, sr=sr, norm=False
     )
-
 
 def amp_sound(file_path, y, sr):
   # amp the sound by 1.5
@@ -252,7 +382,125 @@ def amp_sound(file_path, y, sr):
   path = cur_dir.replace('train', 'augmentation')
   file = os.path.basename(os.path.normpath(file_path))
   file, ext = os.path.splitext(file)
-  file += '_amp' + ext
+  file += '_amp'
+
+  noise_num_1 = 0
+  noise_num_2 = 0
+  noise_num_3 = 0
+
+  while(noise_num_1 == noise_num_2 or noise_num_2 == noise_num_3):
+    noise_num_1 = random.randrange(1,7)
+    noise_num_2 = random.randrange(1,7)
+    noise_num_3 = random.randrange(1,7)
+
+  if noise_num_1 == 1 or noise_num_2 == 1 or noise_num_3 == 1:
+    noise1(path, file, new_y, sr)
+  if noise_num_1 == 2 or noise_num_2 == 2 or noise_num_3 == 2:
+    noise2(path, file, new_y, sr)
+  if noise_num_1 == 3 or noise_num_2 == 3 or noise_num_3 == 3:
+    noise3(path, file, new_y, sr)
+  if noise_num_1 == 4 or noise_num_2 == 4 or noise_num_3 == 4:
+    noise4(path, file, new_y, sr)
+  if noise_num_1 == 5 or noise_num_2 == 5 or noise_num_3 == 5:
+    noise5(path, file, new_y, sr)
+  if noise_num_1 == 6 or noise_num_2 == 6 or noise_num_3 == 6:
+    noise6(path, file, new_y, sr)
+
+  file += ext
+  fname = os.path.join(path, file)
+
+  if isfile(fname):
+    return
+  else:
+    librosa.output.write_wav(
+        fname, y=new_y, sr=sr, norm=False
+    )
+
+def pitch_down(file_path, y, sr):
+  new_y = np.array(y, dtype=np.float)
+  new_y = librosa.effects.pitch_shift(y, sr, n_steps=-20, bins_per_octave=60)
+  
+  # save
+  file_path = file_path.replace('train', 'augmentation')
+  cur_dir = os.path.dirname(file_path)
+  label = os.path.basename(os.path.normpath(cur_dir))
+  if not isdir('./augmentation/audio/' + label):
+    mkdir('./augmentation/audio/' + label)
+  path = cur_dir.replace('train', 'augmentation')
+  file = os.path.basename(os.path.normpath(file_path))
+  file, ext = os.path.splitext(file)
+  file += '_pitch_down'
+
+  noise_num_1 = 0
+  noise_num_2 = 0
+  noise_num_3 = 0
+
+  while(noise_num_1 == noise_num_2 or noise_num_2 == noise_num_3):
+    noise_num_1 = random.randrange(1,7)
+    noise_num_2 = random.randrange(1,7)
+    noise_num_3 = random.randrange(1,7)
+
+  if noise_num_1 == 1 or noise_num_2 == 1 or noise_num_3 == 1:
+    noise1(path, file, new_y, sr)
+  if noise_num_1 == 2 or noise_num_2 == 2 or noise_num_3 == 2:
+    noise2(path, file, new_y, sr)
+  if noise_num_1 == 3 or noise_num_2 == 3 or noise_num_3 == 3:
+    noise3(path, file, new_y, sr)
+  if noise_num_1 == 4 or noise_num_2 == 4 or noise_num_3 == 4:
+    noise4(path, file, new_y, sr)
+  if noise_num_1 == 5 or noise_num_2 == 5 or noise_num_3 == 5:
+    noise5(path, file, new_y, sr)
+  if noise_num_1 == 6 or noise_num_2 == 6 or noise_num_3 == 6:
+    noise6(path, file, new_y, sr)
+
+  file += ext
+  fname = os.path.join(path, file)
+
+  if isfile(fname):
+    return
+  else:
+    librosa.output.write_wav(
+        fname, y=new_y, sr=sr, norm=False
+    )
+
+def pitch_up(file_path, y, sr):
+  new_y = np.array(y, dtype=np.float)
+  new_y = librosa.effects.pitch_shift(y, sr, n_steps=10, bins_per_octave=40)
+  
+  # save
+  file_path = file_path.replace('train', 'augmentation')
+  cur_dir = os.path.dirname(file_path)
+  label = os.path.basename(os.path.normpath(cur_dir))
+  if not isdir('./augmentation/audio/' + label):
+    mkdir('./augmentation/audio/' + label)
+  path = cur_dir.replace('train', 'augmentation')
+  file = os.path.basename(os.path.normpath(file_path))
+  file, ext = os.path.splitext(file)
+  file += '_pitch_up'
+
+  noise_num_1 = 0
+  noise_num_2 = 0
+  noise_num_3 = 0
+
+  while(noise_num_1 == noise_num_2 or noise_num_2 == noise_num_3):
+    noise_num_1 = random.randrange(1,7)
+    noise_num_2 = random.randrange(1,7)
+    noise_num_3 = random.randrange(1,7)
+
+  if noise_num_1 == 1 or noise_num_2 == 1 or noise_num_3 == 1:
+    noise1(path, file, new_y, sr)
+  if noise_num_1 == 2 or noise_num_2 == 2 or noise_num_3 == 2:
+    noise2(path, file, new_y, sr)
+  if noise_num_1 == 3 or noise_num_2 == 3 or noise_num_3 == 3:
+    noise3(path, file, new_y, sr)
+  if noise_num_1 == 4 or noise_num_2 == 4 or noise_num_3 == 4:
+    noise4(path, file, new_y, sr)
+  if noise_num_1 == 5 or noise_num_2 == 5 or noise_num_3 == 5:
+    noise5(path, file, new_y, sr)
+  if noise_num_1 == 6 or noise_num_2 == 6 or noise_num_3 == 6:
+    noise6(path, file, new_y, sr)
+
+  file += ext
   fname = os.path.join(path, file)
 
   if isfile(fname):
@@ -275,7 +523,7 @@ def shift_sound_right(file_path, y, sr):
   # amplification
   new_y[start:end] *= 1.5
 
-# add noise
+  # add noise
   white_noise = np.random.randn(1)
   new_y[end:] += 0.005 * white_noise[0]
 
@@ -290,9 +538,33 @@ def shift_sound_right(file_path, y, sr):
   path = cur_dir.replace('train', 'augmentation')
   file = os.path.basename(os.path.normpath(file_path))
   file, ext = os.path.splitext(file)
-  file += 'sft_r' + ext
+  file += 'sft_r'
+
+  noise_num_1 = 0
+  noise_num_2 = 0
+  noise_num_3 = 0
+
+  while(noise_num_1 == noise_num_2 or noise_num_2 == noise_num_3):
+    noise_num_1 = random.randrange(1,7)
+    noise_num_2 = random.randrange(1,7)
+    noise_num_3 = random.randrange(1,7)
+
+  if noise_num_1 == 1 or noise_num_2 == 1 or noise_num_3 == 1:
+    noise1(path, file, new_y, sr)
+  if noise_num_1 == 2 or noise_num_2 == 2 or noise_num_3 == 2:
+    noise2(path, file, new_y, sr)
+  if noise_num_1 == 3 or noise_num_2 == 3 or noise_num_3 == 3:
+    noise3(path, file, new_y, sr)
+  if noise_num_1 == 4 or noise_num_2 == 4 or noise_num_3 == 4:
+    noise4(path, file, new_y, sr)
+  if noise_num_1 == 5 or noise_num_2 == 5 or noise_num_3 == 5:
+    noise5(path, file, new_y, sr)
+  if noise_num_1 == 6 or noise_num_2 == 6 or noise_num_3 == 6:
+    noise6(path, file, new_y, sr)
+
+  file += ext
   fname = os.path.join(path, file)
-  
+
   if isfile(fname):
     return
   else:
@@ -310,7 +582,31 @@ def shift_sound_left(file_path, y, sr):
   path = cur_dir.replace('train', 'augmentation')
   file = os.path.basename(os.path.normpath(file_path))
   file, ext = os.path.splitext(file)
-  file += 'sft_l' + ext
+  file += 'sft_l'
+
+  noise_num_1 = 0
+  noise_num_2 = 0
+  noise_num_3 = 0
+
+  while(noise_num_1 == noise_num_2 or noise_num_2 == noise_num_3):
+    noise_num_1 = random.randrange(1,7)
+    noise_num_2 = random.randrange(1,7)
+    noise_num_3 = random.randrange(1,7)
+
+  if noise_num_1 == 1 or noise_num_2 == 1 or noise_num_3 == 1:
+    noise1(path, file, new_y, sr)
+  if noise_num_1 == 2 or noise_num_2 == 2 or noise_num_3 == 2:
+    noise2(path, file, new_y, sr)
+  if noise_num_1 == 3 or noise_num_2 == 3 or noise_num_3 == 3:
+    noise3(path, file, new_y, sr)
+  if noise_num_1 == 4 or noise_num_2 == 4 or noise_num_3 == 4:
+    noise4(path, file, new_y, sr)
+  if noise_num_1 == 5 or noise_num_2 == 5 or noise_num_3 == 5:
+    noise5(path, file, new_y, sr)
+  if noise_num_1 == 6 or noise_num_2 == 6 or noise_num_3 == 6:
+    noise6(path, file, new_y, sr)
+
+  file += ext
   fname = os.path.join(path, file)
   
   if isfile(fname):
@@ -361,8 +657,219 @@ def split_silence(y):
 
   return start, end
 
+def noise1(path, file, y, sr):
+  # noise1 is a white noise
+
+  noise_power = random.randrange(1,15)
+  max_y = max(y)
+
+  if max_y > 0.65:
+    noise_power += 80 
+    noise_file = './augmentation/audio/_background_noise_/white_noise_' + str(noise_power) + '_1th.wav'
+  elif max_y > 0.25:
+    noise_power += 65 
+    noise_file = './augmentation/audio/_background_noise_/white_noise_' + str(noise_power) + '_1th.wav'
+  else:
+    noise_power += 50 
+    noise_file = './augmentation/audio/_background_noise_/white_noise_' + str(noise_power) + '_1th.wav'
+  
+  y1, sr1 = load_audio(noise_file)
+  new_y = np.array(y1, dtype=np.float)
+  len_min = min(len(y), len(y1)) - 1
+  new_y[:len_min] = y[:len_min] + y1[:len_min]
+
+    # save
+
+  file += '_noise1' + '.wav'
+  fname = os.path.join(path, file)
+
+  if isfile(fname):
+    return
+  else:
+    librosa.output.write_wav(
+      fname, y=new_y, sr=sr, norm=False
+    )
+
+def noise2(path, file, y, sr):
+  # noise2 is a pink noise
+
+  noise_power = random.randrange(1,15)
+  max_y = max(y)
+
+  if max_y > 0.65:
+    noise_power += 80 
+    noise_file = './augmentation/audio/_background_noise_/pink_noise_' + str(noise_power) + '_1th.wav'
+  elif max_y > 0.25:
+    noise_power += 65 
+    noise_file = './augmentation/audio/_background_noise_/pink_noise_' + str(noise_power) + '_1th.wav'
+  else:
+    noise_power += 50 
+    noise_file = './augmentation/audio/_background_noise_/pink_noise_' + str(noise_power) + '_1th.wav'
+  
+  y1, sr1 = load_audio(noise_file)
+  new_y = np.array(y1, dtype=np.float)
+  len_min = min(len(y), len(y1)) - 1
+  new_y[:len_min] = y[:len_min] + y1[:len_min]
+
+    # save
+
+  file += '_noise2' + '.wav'
+  fname = os.path.join(path, file)
+ 
+  if isfile(fname):
+    return
+  else:
+    librosa.output.write_wav(
+      fname, y=new_y, sr=sr, norm=False
+    )
+
+def noise3(path, file, y, sr):
+  # noise3 is a running tap
+
+  noise_power = random.randrange(1,15)
+  max_y = max(y)
+
+  if max_y > 0.65:
+    noise_power += 80 
+    noise_file = './augmentation/audio/_background_noise_/running_tap_' + str(noise_power) + '_1th.wav'
+  elif max_y > 0.25:
+    noise_power += 65 
+    noise_file = './augmentation/audio/_background_noise_/running_tap_' + str(noise_power) + '_1th.wav'
+  else:
+    noise_power += 50 
+    noise_file = './augmentation/audio/_background_noise_/running_tap_' + str(noise_power) + '_1th.wav'
+  
+  y1, sr1 = load_audio(noise_file)
+  new_y = np.array(y1, dtype=np.float)
+  len_min = min(len(y), len(y1)) - 1
+  new_y[:len_min] = y[:len_min] + y1[:len_min]
+
+
+
+    # save
+
+  file += '_noise3' + '.wav'
+  fname = os.path.join(path, file)
+  if isfile(fname):
+    return
+  else:
+    librosa.output.write_wav(
+      fname, y=new_y, sr=sr, norm=False
+    )
+
+
+def noise4(path, file, y, sr):
+  # noise4 is a bike
+
+  noise_power = random.randrange(1,15)
+  max_y = max(y)
+
+  if max_y > 0.65:
+    noise_power += 80 
+    noise_file = './augmentation/audio/_background_noise_/exercise_bike_' + str(noise_power) + '_1th.wav'
+  elif max_y > 0.25:
+    noise_power += 65 
+    noise_file = './augmentation/audio/_background_noise_/exercise_bike_' + str(noise_power) + '_1th.wav'
+  else:
+    noise_power += 50 
+    noise_file = './augmentation/audio/_background_noise_/exercise_bike_' + str(noise_power) + '_1th.wav'
+  
+  y1, sr1 = load_audio(noise_file)
+  new_y = np.array(y1, dtype=np.float)
+  len_min = min(len(y), len(y1)) - 1
+  new_y[:len_min] = y[:len_min] + y1[:len_min]
+
+    # save
+
+  file += '_noise4' + '.wav'
+  fname = os.path.join(path, file)
+
+  if isfile(fname):
+    return
+  else:
+    librosa.output.write_wav(
+      fname, y=new_y, sr=sr, norm=False
+    )
+
+
+def noise5(path, file, y, sr):
+  # noise5 is a miaowing
+
+  noise_power = random.randrange(1,15)
+  max_y = max(y)
+
+  if max_y > 0.65:
+    noise_power += 80 
+    noise_file = './augmentation/audio/_background_noise_/dude_miaowing_' + str(noise_power) + '_1th.wav'
+  elif max_y > 0.25:
+    noise_power += 65 
+    noise_file = './augmentation/audio/_background_noise_/dude_miaowing_' + str(noise_power) + '_1th.wav'
+  else:
+    noise_power += 50 
+    noise_file = './augmentation/audio/_background_noise_/dude_miaowing_' + str(noise_power) + '_1th.wav'
+  
+  y1, sr1 = load_audio(noise_file)
+  new_y = np.array(y1, dtype=np.float)
+  len_min = min(len(y), len(y1)) - 1
+  new_y[:len_min] = y[:len_min] + y1[:len_min]
+
+
+    # save
+
+  file += '_noise5' + '.wav'
+  fname = os.path.join(path, file)
+ 
+  if isfile(fname):
+    return
+  else:
+    librosa.output.write_wav(
+      fname, y=new_y, sr=sr, norm=False
+    )
+
+def noise6(path, file, y, sr):
+  # noise6 is a dish
+
+  y1, sr1 = load_audio(
+    './augmentation/audio/_background_noise_/doing_the_dishes_50_9th.wav')
+
+  noise_power = random.randrange(1,15)
+  max_y = max(y)
+
+  if max_y > 0.65:
+    noise_power += 80 
+    noise_file = './augmentation/audio/_background_noise_/doing_the_dishes_' + str(noise_power) + '_1th.wav'
+  elif max_y > 0.25:
+    noise_power += 65 
+    noise_file = './augmentation/audio/_background_noise_/doing_the_dishes_' + str(noise_power) + '_1th.wav'
+  else:
+    noise_power += 50 
+    noise_file = './augmentation/audio/_background_noise_/doing_the_dishes_' + str(noise_power) + '_1th.wav'
+  
+  y1, sr1 = load_audio(noise_file)
+  new_y = np.array(y1, dtype=np.float)
+  len_min = min(len(y), len(y1)) - 1
+  new_y[:len_min] = y[:len_min] + y1[:len_min]
+
+
+
+    # save
+
+  file += '_noise6' + '.wav'
+  fname = os.path.join(path, file)
+
+  if isfile(fname):
+    return
+  else:
+    librosa.output.write_wav(
+      fname, y=new_y, sr=sr, norm=False
+    )
+
+
 if __name__ == '__main__':
   main(sys.argv)
   
+
+ 
+
 
 

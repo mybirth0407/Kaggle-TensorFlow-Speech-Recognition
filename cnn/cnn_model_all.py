@@ -42,7 +42,7 @@ from keras.optimizers import Adam
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
 from keras.callbacks import ReduceLROnPlateau
 
-epochs = 2
+epochs = 1
 batch_size = 256
 frame_size = 51
 use_mel = 40
@@ -54,28 +54,27 @@ def main(argv):
 ###############################################################################
 
   print('data loading!')
-
   file_list = listdir(argv[1])
   shuffle(file_list)
 
-  val_list = []
-  test_list = []
   train_list = []
-  val_list.append(os.path.join(argv[1], file_list[0]))
   
   for file in file_list:
-    train_list.append(os.path.join(argv[1], file))
+    if file.find('val') != -1:
+      train_list.append(os.path.join(argv[1], file))
+    elif file.find('test') != -1:
+      train_list.append(os.path.join(argv[1], file))
 
   # gc plz..
   file_list = None
 
-  x_val, y_val = get_feature_mode('val', val_list)
+  x_train, y_train = get_feature_mode('val and test', train_list)
   if use == 'mel':
-    x_val = x_val.reshape(x_val.shape[0], frame_size, use_mel, 1)
+    x_train = x_train.reshape(x_train.shape[0], frame_size, use_mel, 1)
   elif use == 'mfcc':
-    x_val = x_val.reshape(x_val.shape[0], frame_size, use_mfcc, 1)
-  print(x_val.shape)
-  print(y_val.shape)
+    x_train = x_train.reshape(x_train.shape[0], frame_size, use_mfcc, 1)
+  print(x_train.shape)
+  print(y_train.shape)
 
   print('data loading done!')
 
@@ -83,8 +82,8 @@ def main(argv):
 
   print('model loading!')
 
-  print(x_val.shape[1])
-  print(y_val.shape[1])
+  print(x_train.shape[1])
+  print(y_train.shape[1])
   input_shape = (frame_size, use_mfcc, 1)
   model = load_model(argv[2])
 
@@ -96,7 +95,7 @@ def main(argv):
   time_stamp = os.path.dirname(argv[2])
   file_name = os.path.basename(os.path.normpath(argv[2]))
   file_name, _ = os.path.splitext(file_name)
-  save_dir = os.path.join(os.getcwd(), 'saved_models_' + time_stamp[-6:] + use)
+  save_dir = os.path.join(os.getcwd(), time_stamp)
   model_name = file_name + '.{epoch:03d}.h5'
 
   if not isdir(save_dir):
@@ -124,11 +123,13 @@ def main(argv):
 
   print('model fit!')
 
-  import time
-  model_time = time.time()
+  # gc
+  x_train = None
+  y_train = None
+  
   model.fit_generator(
       generator=generate_file(train_list, batch_size),
-      steps_per_epoch=1587,
+      steps_per_epoch=53,
       epochs=epochs,
       use_multiprocessing=True,
       verbose=1,
@@ -136,9 +137,6 @@ def main(argv):
       callbacks=callbacks
   )
 
-  # gc
-  x_val = None
-  y_val = None
   print('model fit done!')
   
 ###############################################################################

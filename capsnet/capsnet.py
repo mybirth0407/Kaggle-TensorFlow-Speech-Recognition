@@ -109,9 +109,9 @@ def main(argv):
   print('callback define!')
   import time
   now = time.localtime()
-  time_stamp = '%02d%02d%02d' % (now.tm_mday, now.tm_hour, now.tm_min)
+  time_stamp = '%02d%02d%02d_' % (now.tm_mday, now.tm_hour, now.tm_min)
   save_dir = os.path.join(os.getcwd(), 'saved_models_' + time_stamp + use)
-  model_name = 'capsnet_model.{epoch:03d}.h5'
+  model_name = 'capsnet_weight.{epoch:03d}.h5'
 
   if not isdir(save_dir):
     mkdir(save_dir)
@@ -165,10 +165,10 @@ def main(argv):
   elif use =='mfcc':
     x_test = x_test.reshape(x_test.shape[0], frame_size, use_mfcc, 1)
   # predict = model.predict(x_test, batch_size=batch_size)
-    score = model.evaluate(
-        ([x_test, y_test], [y_test, x_test]),
-        batch_size=batch_size
-    )
+  score = model.evaluate(
+      ([x_test, y_test], [y_test, x_test]),
+      batch_size=batch_size
+  )
   print('model evaluate done!')
 
 def generate_file(file_list, batch_size):

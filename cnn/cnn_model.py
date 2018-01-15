@@ -46,6 +46,7 @@ batch_size = 256
 frame_size = 51
 use_mel = 40
 use_mfcc = 39
+n_classes = 12
 
 use = sys.argv[2]
 
@@ -97,21 +98,21 @@ def main(argv):
   model.add(Activation('relu'))
   model.add(Conv2D(32, (3, 3)))
   model.add(Activation('relu'))
-  model.add(MaxPooling2D(pool_size=(2, 2)))
-  model.add(Dropout(0.25))
+  model.add(MaxPooling2D(pool_size=(3, 1)))
+  model.add(BatchNormalization())
 
   model.add(Conv2D(64, (3, 3), padding='same'))
   model.add(Activation('relu'))
   model.add(Conv2D(64, (3, 3)))
   model.add(Activation('relu'))
-  model.add(MaxPooling2D(pool_size=(2, 2)))
-  model.add(Dropout(0.25))
+  model.add(MaxPooling2D(pool_size=(3, 1)))
+  model.add(BatchNormalization())
 
   model.add(Flatten())
   model.add(Dense(512))
   model.add(Activation('relu'))
-  model.add(Dropout(0.5))
-  model.add(Dense(12))
+  model.add(BatchNormalization())
+  model.add(Dense(n_classes))
   model.add(Activation('softmax'))
   
   model.compile(
@@ -128,7 +129,7 @@ def main(argv):
   print('callback define!')
   import time
   now = time.localtime()
-  time_stamp = '%02d%02d%02d' % (now.tm_mday, now.tm_hour, now.tm_min)
+  time_stamp = '%02d%02d%02d_' % (now.tm_mday, now.tm_hour, now.tm_min)
   save_dir = os.path.join(os.getcwd(), 'saved_models_' + time_stamp + use)
   model_name = 'cnn_model.{epoch:03d}.h5'
 

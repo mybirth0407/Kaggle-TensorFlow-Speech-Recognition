@@ -87,7 +87,7 @@ def main(argv):
   print('callback define!')
   import time
   now = time.localtime()
-  time_stamp = '%02d%02d%02d' % (now.tm_mday, now.tm_hour, now.tm_min)
+  time_stamp = '%02d%02d%02d_' % (now.tm_mday, now.tm_hour, now.tm_min)
   save_dir = os.path.join(os.getcwd(), 'saved_models_' + time_stamp + use)
   model_name = 'resnet_v' + argv[2] + '_model.{epoch:03d}.h5'
 

@@ -33,10 +33,20 @@ from multiprocessing import Pool
 # Use HDF File Format.
 import h5py
 
+from keras import layers, models
+from keras.optimizers import Adam
+from keras import backend as K
+from keras.utils import to_categorical
+from capsulelayers import CapsuleLayer, PrimaryCap, Length, Mask
+
 batch_size = 256
 frame_size = 51
 use_mel = 40
 use_mfcc = 39
+input_shape = (frame_size, use_mfcc, 1)
+n_classes = 12
+routings = 3
+
 
 # mearningful labels
 meaningful_label = ['down', 'go', 'left', 'no', 'off',
@@ -60,7 +70,7 @@ int_dict = dict(zip(
     meaningful_label_dict.values(), meaningful_label_dict.keys()
 ))
 
-use =
+use = sys.argv[2]
 
 
 def get_feature_file_list(file_list):
@@ -73,14 +83,14 @@ def get_feature_file_list(file_list):
   return result
 
 def get_feature_file(file):
-  print(file + ' start!')
+  # print(file + ' start!')
   h5f = h5py.File(file, 'r')
   if use == 'mel':
     feature = h5f['feature'][:,use_mel - 1:]
   elif use == 'mfcc':
     feature = h5f['feature'][:,:use_mfcc]
   h5f.close()
-  print(file + ' done!')
+  # print(file + ' done!')
 
   return feature
 
@@ -125,7 +135,7 @@ def CapsNet(input_shape, n_class, routings):
   decoder.add(layers.Reshape(target_shape=input_shape, name='out_recon'))
 
   # Models for training and evaluation (prediction)
-  test_model = models.Model([x, y], [out_caps, decoder(masked_by_y)])
+  test_model = models.Model(x, [out_caps, decoder(masked)])
 
   return test_model
 
@@ -146,7 +156,7 @@ def margin_loss(y_true, y_pred):
 if __name__ == '__main__':
   model = CapsNet(input_shape=input_shape, n_class=n_classes, routings=routings)
   model.summary()
-  model.load_weights(argv[2])
+  model.load_weights(sys.argv[1])
 
   feature_path = '../feature/test/'
 
@@ -167,12 +177,12 @@ if __name__ == '__main__':
   f.write('fname,label\n')
 
   for i in range(len(file_list)):
+    print(str(i) + '/' + str(len(file_list)))
     feature_list = get_feature_file_list(file_list[i])
     cnt = 1
     will = len(feature_list)
     labels = []
 
-    #########
     for j in range(will):
       feature = feature_list[j]
       # print(feature.shape)
@@ -180,10 +190,10 @@ if __name__ == '__main__':
         feature = feature.reshape(1, frame_size, use_mel, 1)
       elif use == 'mfcc':
         feature = feature.reshape(1, frame_size, use_mfcc, 1)
-      print(str(cnt) + '/' + str(will))
+      # print(str(cnt) + '/' + str(will))
       # axis = 0, column appending
-      predict = model.predict(feature, batch_size=256)
-      label_index = list(np.argmax(predict, axis=1))
+      y_pred, x_recon = model.predict(feature, batch_size=256)
+      label_index = list(np.argmax(y_pred, axis=1))
       y = max(set(label_index), key=label_index.count)
       y = int_dict.get(y)
       if y in meaningful_label:
