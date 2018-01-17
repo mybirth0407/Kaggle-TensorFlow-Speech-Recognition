@@ -25,8 +25,8 @@ from tensorflow.contrib.framework import arg_scope
 # Hyperparameter
 growth_k = 12
 nb_block = 2 # how many (dense block + Transition Layer) ?
-init_learning_rate = 1e-3
-epsilon = 1e-8 # AdamOptimizer epsilon
+init_learning_rate = 1e-4
+epsilon = 1e-10 # AdamOptimizer epsilon
 dropout_rate = 0.2
 
 # Momentum Optimizer will use
@@ -123,7 +123,7 @@ def Average_pooling(x, pool_size=[2,2], stride=2, padding='VALID'):
     return tf.layers.average_pooling2d(inputs=x, pool_size=pool_size, strides=stride, padding=padding)
 
 
-def Max_Pooling(x, pool_size=[2,2], stride=2, padding='VALID'):
+def Max_Pooling(x, pool_size=[3,3], stride=2, padding='VALID'):
     return tf.layers.max_pooling2d(inputs=x, pool_size=pool_size, strides=stride, padding=padding)
 
 def Concatenation(layers) :
@@ -151,7 +151,7 @@ class DenseNet():
 
             x = Batch_Normalization(x, training=self.training, scope=scope+'_batch2')
             x = Relu(x)
-            x = conv_layer(x, filter=self.filters, kernel=[4,10], layer_name=scope+'_conv2')
+            x = conv_layer(x, filter=self.filters, kernel=[3,3], layer_name=scope+'_conv2')
             x = Drop_out(x, rate=dropout_rate, training=self.training)
 
             # print(x)
@@ -187,18 +187,13 @@ class DenseNet():
             return x
 
     def Dense_net(self, input_x):
-        x = conv_layer(input_x, filter=2 * self.filters, kernel=[4,10], 
-                        stride=1, layer_name='conv0')
-        x = Max_Pooling(x, pool_size=[2,2], stride=2)
-
-        x = conv_layer(input_x, filter=2 * self.filters, kernel=[2,5], 
-                        stride=1, layer_name='conv1')
-        x = Max_Pooling(x, pool_size=[2,2], stride=2)
+        x = conv_layer(input_x, filter=2 * self.filters, kernel=[7,7], stride=2, layer_name='conv0')
+        x = Max_Pooling(x, pool_size=[3,3], stride=2)
 
 
         for i in range(self.nb_blocks) :
             # 6 -> 12 -> 48
-            x = self.dense_block(input_x=x, nb_layers=4, layer_name='dense_'+str(i))
+            x = self.dense_block(input_x=x, nb_layers=6, layer_name='dense_'+str(i))
             x = self.transition_layer(x, scope='trans_'+str(i))
 
         """
@@ -210,7 +205,7 @@ class DenseNet():
         x = self.transition_layer(x, scope='trans_3')
         """
 
-        x = self.dense_block(input_x=x, nb_layers=32, layer_name='dense_final')
+        x = self.dense_block(input_x=x, nb_layers=40, layer_name='dense_final')
 
         # 100 Layer
         x = Batch_Normalization(x, training=self.training, scope='linear_batch')
@@ -238,7 +233,7 @@ def get_feature_file_list(file_list):
 def get_feature_file(file):
 #    print(file + ' start!')
     h5f = h5py.File(file, 'r')
-    feature = h5f['feature'][:, :39]
+    feature = h5f['feature'][:]
     h5f.close()
 #    print(file + ' done!')
 
@@ -266,7 +261,7 @@ def main(argv):
 
     # f = open('./pred/pred_' + str(time.time()) +  '.csv', 'w')
     pred_file, _ = os.path.splitext(sys.argv[1])
-    pred_file = os.path.join('./pred/densenet_v3_k_0115')# pred_file)
+    pred_file = os.path.join('./pred/dense_0111_1530')# pred_file)
     f = open(pred_file + '.csv', 'w')
     f.write('fname,label\n')
 

@@ -1,21 +1,3 @@
-# Keras metrics method
-from keras import metrics
-# Keras perceptron neuron layer implementation.
-from keras.layers import Dense
-# Keras Dropout layer implementation.
-from keras.layers import Dropout
-# Keras Activation Function layer implementation.
-from keras.layers import Activation
-# Keras Batch normalization
-from keras.layers.normalization import BatchNormalization
-# Keras Model object.
-from keras.models import Sequential
-# Keras Model load
-from keras.models import load_model
-# Keras Optimizer for custom user.
-from keras import optimizers
-# Keras Loss for custom user.
-from keras import losses
 # Numeric Python Library.
 import numpy as np
 # Get System Argument.

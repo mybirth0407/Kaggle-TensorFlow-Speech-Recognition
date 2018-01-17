@@ -29,8 +29,8 @@ import time
 # Hyperparameter
 growth_k = 12
 nb_block = 2 # how many (dense block + Transition Layer) ?
-init_learning_rate = 1e-3
-epsilon = 1e-8 # AdamOptimizer epsilon
+init_learning_rate = 1e-4
+epsilon = 1e-10 # AdamOptimizer epsilon
 dropout_rate = 0.2
 
 # Momentum Optimizer will use
@@ -41,7 +41,7 @@ weight_decay = 1e-4
 class_num = 12
 #batch_size = 100
 
-total_epochs = 10 #12
+total_epochs = 3 #12
 
 # Densenet Network Design
 
@@ -94,7 +94,7 @@ def Average_pooling(x, pool_size=[2,2], stride=2, padding='VALID'):
     return tf.layers.average_pooling2d(inputs=x, pool_size=pool_size, strides=stride, padding=padding)
 
 
-def Max_Pooling(x, pool_size=[2,2], stride=2, padding='VALID'):
+def Max_Pooling(x, pool_size=[3,3], stride=2, padding='VALID'):
     return tf.layers.max_pooling2d(inputs=x, pool_size=pool_size, strides=stride, padding=padding)
 
 def Concatenation(layers) :
@@ -122,7 +122,7 @@ class DenseNet():
 
             x = Batch_Normalization(x, training=self.training, scope=scope+'_batch2')
             x = Relu(x)
-            x = conv_layer(x, filter=self.filters, kernel=[4,10], layer_name=scope+'_conv2')
+            x = conv_layer(x, filter=self.filters, kernel=[3,3], layer_name=scope+'_conv2')
             x = Drop_out(x, rate=dropout_rate, training=self.training)
 
             # print(x)
@@ -158,17 +158,13 @@ class DenseNet():
             return x
 
     def Dense_net(self, input_x):
-        x = conv_layer(input_x, filter=2 * self.filters, kernel=[8,20], 
-                        stride=1, layer_name='conv0')
-        x = Max_Pooling(x, pool_size=[2,2], stride=2)
+        x = conv_layer(input_x, filter=2 * self.filters, kernel=[7,7], stride=2, layer_name='conv0')
+        x = Max_Pooling(x, pool_size=[3,3], stride=2)
 
-        x = conv_layer(input_x, filter=2 * self.filters, kernel=[4,10], 
-                        stride=1, layer_name='conv1')
-        x = Max_Pooling(x, pool_size=[2,2], stride=2)
 
         for i in range(self.nb_blocks) :
             # 6 -> 12 -> 48
-            x = self.dense_block(input_x=x, nb_layers=4, layer_name='dense_'+str(i))
+            x = self.dense_block(input_x=x, nb_layers=6, layer_name='dense_'+str(i))
             x = self.transition_layer(x, scope='trans_'+str(i))
 
         """
@@ -180,7 +176,7 @@ class DenseNet():
         x = self.transition_layer(x, scope='trans_3')
         """
 
-        x = self.dense_block(input_x=x, nb_layers=32, layer_name='dense_final')
+        x = self.dense_block(input_x=x, nb_layers=40, layer_name='dense_final')
 
         # 100 Layer
         x = Batch_Normalization(x, training=self.training, scope='linear_batch')
@@ -199,7 +195,7 @@ def main(argv):
 ###############################################################################
 
     epochs = 12
-    batch_size = 128
+    batch_size = 256
 
 ###############################################################################
 
@@ -264,10 +260,10 @@ def main(argv):
 ###############################################################################
 
     with tf.Session() as sess:
-        if not isdir('./model_v3'):
-            mkdir('./model_v3')
+        if not isdir('./model'):
+            mkdir('./model')
 
-        ckpt = tf.train.get_checkpoint_state('./model_v3')
+        ckpt = tf.train.get_checkpoint_state('./loadval')
         if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
             print("LOADING\n\n")
             saver.restore(sess, ckpt.model_checkpoint_path)
@@ -277,12 +273,11 @@ def main(argv):
         merged = tf.summary.merge_all()
         writer = tf.summary.FileWriter('./logs', sess.graph)
 
-        best = 0.
         global_step = 0
         epoch_learning_rate = init_learning_rate
         for epoch in range(total_epochs):
-            total_steps = 20
-            train_generator = generate_file(val_list, 128)
+            total_steps = 10
+            train_generator = generate_file(val_list, 256)
             for step in range(total_steps):
                 batch_x, batch_y = next(train_generator)
 
@@ -316,12 +311,12 @@ def main(argv):
                         "Val accuracy: %.5f" % val_accuracy)
                     writer.add_summary(train_summary, global_step=epoch)
 
-                    if val_accuracy > 0.94 and val_accuracy > best:
+                    if val_accuracy > 0.94:
                         print('model save!')
-                        best = val_accuracy
                         timestr = str(datetime.datetime.now())
-                        saver.save(sess=sess, save_path='./loadval_v3/densenet_model_' 
-                                + timestr[:10] + 'T' + timestr[11:19] + '_' + str(best) +'.ckpt')
+                        saver.save(sess=sess, save_path='./loadval/densenet_model_' 
+                                + timestr[:10] + 'T' + timestr[11:19] + '_optimal' +'.ckpt')
+
 
         print('model fit done!')
   
@@ -329,7 +324,7 @@ def main(argv):
 
         print('model save!')
         timestr = str(datetime.datetime.now())
-        saver.save(sess=sess, save_path='./loadval_v3/densenet_model_' 
+        saver.save(sess=sess, save_path='./loadval/densenet_model_' 
                                 + timestr[:10] + 'T' + timestr[11:19] + '.ckpt')
         print('model save done!')
 
@@ -358,7 +353,7 @@ def generate_file(file_list, batch_size):
     while True:
         for file in file_list:
             h5f = h5py.File(file, 'r')
-            feature = h5f['feature'][:, :, :39]
+            feature = h5f['feature'][:]
             feature = feature.reshape(feature.shape[0], 51, 39, 1)
             label = h5f['label'][:]
             h5f.close()
@@ -411,7 +406,7 @@ def get_feature_file_list(file_list):
 def get_feature_file(file):
     print(file + ' start!')
     h5f = h5py.File(file, 'r')
-    feature = h5f['feature'][:, :, :39]
+    feature = h5f['feature'][:]
     label = h5f['label'][:] 
     h5f.close()
     print(file + ' done!')
