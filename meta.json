@@ -1,7 +1,7 @@
 {
     "sample_rate": 16000,
-    "n_mfcc": 39,
-    "n_mels": 40,
+    "n_mfcc": 128,
+    "n_mels": 128,
     "n_fft": 1024,
     "hop_length": 0.02,
     "win_length": 0.04,
